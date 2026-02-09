@@ -9,6 +9,14 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
 const App: React.FC = () => {
+  // --- LOAD GOOGLE FONTS ---
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.href = "https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&family=Indie+Flower&family=Inter:wght@400;700&display=swap";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }, []);
+
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('comic-editor-state-v5');
     const initial: AppState = {
@@ -24,7 +32,6 @@ const App: React.FC = () => {
     return initial;
   });
 
-  // Sinkronisasi data ke LocalStorage dan Cache
   useEffect(() => {
     localStorage.setItem('comic-editor-state-v5', JSON.stringify({
       globalStyle: state.globalStyle,
@@ -63,8 +70,15 @@ const App: React.FC = () => {
   const selectedPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
   const selectedPage = state.pages[selectedPageIndex] || null;
 
+  const navigatePage = (direction: 'next' | 'prev') => {
+    const newIndex = direction === 'next' ? selectedPageIndex + 1 : selectedPageIndex - 1;
+    if (newIndex >= 0 && newIndex < state.pages.length) {
+      setState(prev => ({ ...prev, selectedPageId: state.pages[newIndex].id, selectedTextId: null }));
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-inter">
       <Sidebar 
         state={state} setState={setState} 
         onTextImport={(txt) => {
@@ -99,23 +113,42 @@ const App: React.FC = () => {
           state.isGalleryView ? (
             <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(p => ({ ...p, selectedPageId: id, isGalleryView: false }))} />
           ) : (
-            <div className="h-full flex flex-col items-center">
+            <div className="h-full flex flex-col items-center relative">
               <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
                 <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">← Back to Gallery</button>
                 <span className="text-xs font-mono text-slate-500">Page {selectedPageIndex + 1} / {state.pages.length}</span>
               </div>
 
-              {selectedPage && (
-                <Editor 
-                  page={selectedPage} 
-                  hideLabels={state.hideLabels}
-                  globalStyle={state.globalStyle}
-                  selectedTextId={state.selectedTextId}
-                  onUpdateText={(textId, updates) => updatePageText(selectedPage.id, textId, updates)}
-                  onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
-                  onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
-                />
-              )}
+              <div className="flex-1 w-full flex items-center justify-center gap-4 relative">
+                {/* FLOATING NAVIGATION BUTTONS */}
+                <button 
+                  onClick={() => navigatePage('prev')} 
+                  disabled={selectedPageIndex === 0}
+                  className="absolute left-0 z-20 p-4 bg-slate-800/80 hover:bg-blue-600 disabled:opacity-0 rounded-full transition-all shadow-xl border border-slate-700"
+                >
+                  PREV
+                </button>
+
+                {selectedPage && (
+                  <Editor 
+                    page={selectedPage} 
+                    hideLabels={state.hideLabels}
+                    globalStyle={state.globalStyle}
+                    selectedTextId={state.selectedTextId}
+                    onUpdateText={(textId, updates) => updatePageText(selectedPage.id, textId, updates)}
+                    onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
+                    onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
+                  />
+                )}
+
+                <button 
+                  onClick={() => navigatePage('next')} 
+                  disabled={selectedPageIndex === state.pages.length - 1}
+                  className="absolute right-0 z-20 p-4 bg-slate-800/80 hover:bg-blue-600 disabled:opacity-0 rounded-full transition-all shadow-xl border border-slate-700"
+                >
+                  NEXT
+                </button>
+              </div>
             </div>
           )
         )}

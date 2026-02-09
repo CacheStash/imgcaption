@@ -19,14 +19,27 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMaskMode, setIsMaskMode] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+
   const activeStyle = page.overrideStyle || globalStyle;
+
+  // --- FIX BLANK SCREEN: ResizeObserver ---
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      const width = entries[0].contentRect.width;
+      if (width > 0) setContainerWidth(width);
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const applyAutoLayout = useCallback((fCanvas: any) => {
     const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
     if (texts.length === 0) return;
     const padding = activeStyle.padding || 20;
     const gap = 15;
-    let totalHeight = texts.reduce((acc: number, o: any) => acc + (o.height * o.scaleY) + gap, 0) - gap;
+    let totalHeight = texts.reduce((acc: number, o: any) => acc + (o.getScaledHeight()) + gap, 0) - gap;
     let currentY = padding;
 
     if (activeStyle.verticalAlign === 'middle') currentY = (fCanvas.height / 2) - (totalHeight / 2);
@@ -71,21 +84,23 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   }, [isMaskMode, addSmartMask, onSelectText]);
 
   useEffect(() => {
-    if (!fabricCanvasRef.current) return;
+    if (!fabricCanvasRef.current || containerWidth === 0) return;
     const fCanvas = fabricCanvasRef.current;
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
       if (!img) return;
-      const containerWidth = containerRef.current?.clientWidth || 800;
       const scale = containerWidth / img.width;
-      fCanvas.setDimensions({ width: img.width * scale, height: img.height * scale });
+      const finalW = img.width * scale;
+      const finalH = img.height * scale;
+      fCanvas.setDimensions({ width: finalW, height: finalH });
       img.set({ scaleX: scale, scaleY: scale, selectable: false, evented: false });
       fCanvas.setBackgroundImage(img, () => {
         const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
         texts.forEach((o: any) => fCanvas.remove(o));
         page.textObjects.forEach((obj) => {
+          // --- FIX WRAPPED TEXT LOGIC ---
+          const boxWidth = activeStyle.boxType === 'caption' ? finalW - (activeStyle.padding * 2) : 300;
           const tBox = new fabric.Textbox(cleanText(obj.originalText, hideLabels), {
-            width: obj.boxType === 'caption' ? fCanvas.width - (activeStyle.padding * 2) : 280,
-            fontSize: obj.fontSize, fill: obj.color, textAlign: obj.alignment, fontFamily: obj.fontFamily,
+            width: boxWidth, fontSize: obj.fontSize, fill: obj.color, textAlign: obj.alignment, fontFamily: obj.fontFamily,
             stroke: obj.outlineColor, strokeWidth: obj.outlineWidth, strokeUniform: true, paintFirst: 'stroke',
             backgroundColor: obj.textBackgroundColor !== 'transparent' ? obj.textBackgroundColor : null,
             data: { id: obj.id, type: 'text' }, shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur })
@@ -95,7 +110,7 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
         applyAutoLayout(fCanvas);
       });
     }, { crossOrigin: 'anonymous' });
-  }, [page.imageUrl, page.textObjects, activeStyle, hideLabels, applyAutoLayout]);
+  }, [page.imageUrl, page.textObjects, activeStyle, hideLabels, applyAutoLayout, containerWidth]);
 
   return (
     <div className="w-full flex flex-col items-center gap-4">
@@ -110,20 +125,12 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
         <select 
           value={activeStyle.fontFamily} 
           onChange={(e) => onUpdateOverride({...activeStyle, fontFamily: e.target.value})} 
-          className="bg-slate-900 text-[10px] px-2 h-8 rounded border border-slate-700 outline-none text-slate-200"
+          className="bg-slate-900 text-[10px] px-2 h-8 rounded outline-none border border-slate-700 text-slate-200"
         >
           {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
         </select>
-        <div className="w-px h-6 bg-slate-700 mx-1"></div>
-        <select value={activeStyle.alignment} onChange={(e) => onUpdateOverride({...activeStyle, alignment: e.target.value as Alignment})} className="bg-transparent text-[10px] px-2 outline-none text-slate-200">
-          <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
-        </select>
-        <select value={activeStyle.verticalAlign} onChange={(e) => onUpdateOverride({...activeStyle, verticalAlign: e.target.value as VerticalAlignment})} className="bg-transparent text-[10px] px-2 outline-none text-slate-200">
-          <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
-        </select>
       </div>
-      <div ref={containerRef} className="w-full flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[400px]">
-        {isMaskMode && <div className="absolute inset-0 bg-blue-500/5 cursor-crosshair z-10 border-2 border-blue-500/20 pointer-events-none"></div>}
+      <div ref={containerRef} className="w-full max-w-4xl flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[400px]">
         <canvas ref={canvasRef} />
       </div>
     </div>
