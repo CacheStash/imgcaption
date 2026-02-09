@@ -1,68 +1,76 @@
-import { TextObject, TextStyle, Page } from '../types';
+
+import { TextObject, TextStyle, Alignment, VerticalAlignment, ImportMode } from '../types';
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const FONT_OPTIONS = [
   { name: 'Formal', value: 'Inter' },
   { name: 'Casual', value: 'sans-serif' },
-  { name: 'Fun (Comic)', value: "'Comic Neue', cursive" },
-  { name: 'Horror / Action', value: 'Bangers' },
-  { name: 'Script', value: "'Indie Flower', cursive" }
+  { name: 'Fun', value: "'Comic Neue', cursive" },
+  { name: 'Comic/Manga', value: "'Indie Flower', cursive" },
+  { name: 'Action', value: 'Bangers' }
 ];
-
-export const DEFAULT_STYLE: TextStyle = {
-  fontSize: 24,
-  color: '#000000',
-  alignment: 'center',
-  verticalAlign: 'top',
-  outlineColor: '#ffffff',
-  outlineWidth: 4,
-  glowColor: '#ffffff',
-  glowBlur: 10,
-  glowOpacity: 0.8,
-  fontFamily: "'Comic Neue', cursive",
-  padding: 20,
-  boxType: 'caption',
-  textBackgroundColor: 'transparent'
-};
-
-export const getFileCacheKey = (fileName: string, fileSize: number) => `zen-cache-${fileName}-${fileSize}`;
-
-export const savePageToCache = (page: Page) => {
-  const key = getFileCacheKey(page.fileName, page.fileSize || 0);
-  localStorage.setItem(key, JSON.stringify({ textObjects: page.textObjects, overrideStyle: page.overrideStyle }));
-};
-
-export const loadPageFromCache = (fileName: string, fileSize: number): any | null => {
-  const saved = localStorage.getItem(getFileCacheKey(fileName, fileSize));
-  return saved ? JSON.parse(saved) : null;
-};
 
 export const cleanText = (text: string, hideLabels: boolean): string => {
   if (!hideLabels) return text.trim();
-  return text.replace(/Page\s+\d+\s*-\s*/gi, '').replace(/(?:^|,\s*)[^:]+:\s*/g, (match) => match.startsWith(',') ? ', ' : '').trim();
+  return text.replace(/^[^:]+:\s*/, '').trim();
 };
 
-export const parseRawText = (text: string): Record<number, string[]> => {
+export const parseRawText = (text: string, mode: ImportMode = 'box'): Record<number, string[]> => {
   const result: Record<number, string[]> = {};
   const pageRegex = /Page\s+(\d+)\s*-\s*/gi;
   const sections = text.split(pageRegex);
+  
   for (let i = 1; i < sections.length; i += 2) {
     const pageNum = parseInt(sections[i], 10);
-    const content = (sections[i + 1] || '').trim();
-    if (!content) continue;
-    const dialogues = content.split(/,\s*(?=[^:]+:)/g).map(d => d.trim()).filter(d => d.length > 0);
-    if (dialogues.length > 0) result[pageNum] = dialogues;
+    let content = (sections[i + 1] || '').trim();
+    if (content.toLowerCase().includes('[gak ada dialog]') || content.toLowerCase().includes('[halaman statis]')) continue;
+    
+    // Merge dialogues per page to prevent overlapping multiple boxes
+    const mergedContent = content.replace(/,\s*(?=[^:]+:)/g, '\n').trim();
+    
+    if (mergedContent.length > 0) {
+      result[pageNum] = [mergedContent];
+    }
   }
   return result;
 };
 
-export const createDefaultTextObject = (content: string, style: TextStyle): TextObject => ({
-  id: generateId(),
-  originalText: content,
-  x: 50,
-  y: 50,
-  width: style.boxType === 'caption' ? 500 : 280,
-  isManuallyPlaced: false, // INIT FALSE
-  ...style
-});
+export const getPosFromAlign = (align: Alignment, vAlign: VerticalAlignment) => {
+  let x = 50;
+  let y = 50;
+  if (align === 'left') x = 20;
+  if (align === 'right') x = 80;
+  if (vAlign === 'top') y = 15;
+  if (vAlign === 'bottom') y = 85;
+  return { x, y };
+};
+
+export const createDefaultTextObject = (content: string, style: TextStyle): TextObject => {
+  const { x, y } = getPosFromAlign(style.alignment, style.verticalAlignment);
+  return {
+    id: generateId(),
+    originalText: content,
+    x,
+    y,
+    width: 450,
+    ...style
+  };
+};
+
+export const DEFAULT_STYLE: TextStyle = {
+  fontSize: 24,
+  paddingTop: 10,
+  paddingRight: 10,
+  paddingBottom: 10,
+  paddingLeft: 10,
+  color: '#ffffff',
+  alignment: 'center',
+  verticalAlignment: 'middle',
+  outlineColor: '#000000',
+  outlineWidth: 4,
+  glowColor: '#ffffff',
+  glowBlur: 0,
+  glowOpacity: 0.5,
+  fontFamily: "'Comic Neue', cursive"
+};

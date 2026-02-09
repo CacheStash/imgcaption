@@ -1,119 +1,219 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { Page, TextObject, TextStyle, Alignment, VerticalAlignment } from '../types';
-import { cleanText, FONT_OPTIONS } from '../utils/helpers';
+
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Page, TextObject } from '../types';
+import { cleanText } from '../utils/helpers';
 
 interface EditorProps {
   page: Page;
   hideLabels: boolean;
   selectedTextId: string | null;
-  globalStyle: TextStyle;
   onUpdateText: (textId: string, updates: Partial<TextObject>) => void;
   onSelectText: (id: string | null) => void;
-  onUpdateOverride: (style: TextStyle) => void;
+  onRecordHistory: () => void;
+  onResize: (width: number) => void;
 }
 
 declare const fabric: any;
 
-const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globalStyle, onUpdateText, onSelectText, onUpdateOverride }) => {
+const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpdateText, onSelectText, onRecordHistory, onResize }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
+  const isRenderingRef = useRef(false);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
 
-  const activeStyle = page.overrideStyle || globalStyle;
+  const callbacks = useRef({ onUpdateText, onSelectText, onRecordHistory, onResize });
+  useEffect(() => { callbacks.current = { onUpdateText, onSelectText, onRecordHistory, onResize }; }, [onUpdateText, onSelectText, onRecordHistory, onResize]);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver(entries => {
-      const width = entries[0].contentRect.width;
-      if (width > 0) setContainerWidth(width);
-    });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
+  // Enhanced stacking: ensuring vertical hierarchy for merged blocks
+  const resolveStacking = useCallback((fCanvas: any) => {
+    const textboxes = fCanvas.getObjects().filter((o: any) => o.data?.id);
+    if (textboxes.length <= 1) return;
+
+    // Stable sort based on current top position to maintain visual hierarchy
+    textboxes.sort((a: any, b: any) => a.top - b.top);
+
+    const PADDING = 15;
+    let changed = false;
+
+    for (let i = 0; i < textboxes.length; i++) {
+      const current = textboxes[i];
+      const currentRect = current.getBoundingRect();
+
+      for (let j = 0; j < i; j++) {
+        const above = textboxes[j];
+        const aboveRect = above.getBoundingRect();
+
+        // Horizontal intersection check
+        const overlapX = (currentRect.left < aboveRect.left + aboveRect.width) && 
+                         (currentRect.left + currentRect.width > aboveRect.left);
+        
+        // If overlapping horizontally and vertically too close, shift down
+        if (overlapX && currentRect.top < aboveRect.top + aboveRect.height + PADDING) {
+          current.set({ top: aboveRect.top + aboveRect.height + PADDING });
+          current.setCoords();
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) fCanvas.renderAll();
   }, []);
 
-  const applyAutoLayout = useCallback((fCanvas: any) => {
-    const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text' && !o.data?.isManuallyPlaced);
-    if (texts.length === 0) return;
-
-    const padding = activeStyle.padding || 20;
-    const gap = 15;
-    let totalHeight = texts.reduce((acc: number, o: any) => acc + o.getScaledHeight() + gap, 0) - gap;
-    let currentY = padding;
-
-    if (activeStyle.verticalAlign === 'middle') currentY = (fCanvas.height / 2) - (totalHeight / 2);
-    else if (activeStyle.verticalAlign === 'bottom') currentY = fCanvas.height - totalHeight - padding;
-
-    texts.forEach((obj: any) => {
-      let currentX = padding;
-      if (activeStyle.alignment === 'center') currentX = (fCanvas.width / 2) - (obj.getScaledWidth() / 2);
-      else if (activeStyle.alignment === 'right') currentX = fCanvas.width - obj.getScaledWidth() - padding;
-      obj.set({ left: currentX, top: currentY });
-      obj.setCoords();
-      currentY += (obj.getScaledHeight()) + gap;
-    });
-    fCanvas.renderAll();
-  }, [activeStyle]);
-
-  // Inisialisasi Canvas Sekali Saja
   useEffect(() => {
     if (!canvasRef.current) return;
-    const fCanvas = new fabric.Canvas(canvasRef.current, { backgroundColor: '#0f172a', preserveObjectStacking: true });
+    const fCanvas = new fabric.Canvas(canvasRef.current, { backgroundColor: '#1e293b', preserveObjectStacking: true, selection: true });
     fabricCanvasRef.current = fCanvas;
 
-    fCanvas.on('selection:created', (e: any) => onSelectText(e.selected[0]?.data?.id || null));
-    fCanvas.on('selection:cleared', () => onSelectText(null));
-    fCanvas.on('object:modified', (e: any) => {
+    const handleSelection = (e: any) => {
+      if (isRenderingRef.current) return;
+      const activeObj = e.selected ? e.selected[0] : e.target;
+      if (activeObj && activeObj.data?.id) callbacks.current.onSelectText(activeObj.data.id);
+    };
+
+    fCanvas.on('selection:created', handleSelection);
+    fCanvas.on('selection:updated', handleSelection);
+    fCanvas.on('selection:cleared', () => { if (!isRenderingRef.current) callbacks.current.onSelectText(null); });
+
+    const handleModified = (e: any) => {
+      if (isRenderingRef.current) return;
       const obj = e.target;
-      if (obj.data?.type === 'text') {
-        onUpdateText(obj.data.id, { x: obj.left / fCanvas.width, y: obj.top / fCanvas.height, isManuallyPlaced: true });
+      if (obj && obj.data?.id) {
+        callbacks.current.onRecordHistory();
+        resolveStacking(fCanvas);
+
+        const bgWidth = fCanvas.backgroundImage?.width * fCanvas.backgroundImage?.scaleX || 1;
+        const bgHeight = fCanvas.backgroundImage?.height * fCanvas.backgroundImage?.scaleY || 1;
+        const bgLeft = fCanvas.backgroundImage?.left || 0;
+        const bgTop = fCanvas.backgroundImage?.top || 0;
+
+        fCanvas.getObjects().forEach((canvasObj: any) => {
+          if (canvasObj.data?.id) {
+            // Recalculate percentages while accounting for padding offsets
+            const relX = ((canvasObj.left - bgLeft) / bgWidth) * 100;
+            const relY = ((canvasObj.top - bgTop) / bgHeight) * 100;
+            const newWidth = canvasObj.width * canvasObj.scaleX;
+            canvasObj.set({ width: newWidth, scaleX: 1, scaleY: 1 });
+            callbacks.current.onUpdateText(canvasObj.data.id, { x: relX, y: relY, width: newWidth });
+          }
+        });
+      }
+    };
+    
+    const handleTextChanged = (e: any) => {
+      if (isRenderingRef.current) return;
+      const obj = e.target;
+      if (obj && obj.data?.id) {
+        // We only update the originalText if we are not hiding labels
+        // If we ARE hiding labels, this is trickier because we need to preserve the "Name: " part.
+        // For simplicity and user expectation: we update the original text directly.
+        // If hideLabels is true, the user is only editing the dialogue part they see.
+        callbacks.current.onUpdateText(obj.data.id, { originalText: obj.text });
+        resolveStacking(fCanvas);
+      }
+    };
+
+    fCanvas.on('object:modified', handleModified);
+    fCanvas.on('text:changed', handleTextChanged);
+    
+    return () => { if (fabricCanvasRef.current) { fabricCanvasRef.current.dispose(); fabricCanvasRef.current = null; } };
+  }, [resolveStacking]);
+
+  const syncCanvasSize = useCallback(() => {
+    if (!containerRef.current || !fabricCanvasRef.current) return;
+    const { width, height } = containerRef.current.getBoundingClientRect();
+    const fCanvas = fabricCanvasRef.current;
+    fabric.Image.fromURL(page.imageUrl, (img: any) => {
+      if (!fabricCanvasRef.current || !img) return;
+      const imgRatio = img.width / img.height;
+      const containerRatio = width / height;
+      let finalWidth, finalHeight;
+      if (imgRatio > containerRatio) { finalWidth = width; finalHeight = width / imgRatio; }
+      else { finalHeight = height; finalWidth = height * imgRatio; }
+      fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
+      img.set({ scaleX: finalWidth / img.width, scaleY: finalHeight / img.height, left: 0, top: 0, selectable: false, evented: false });
+      fCanvas.setBackgroundImage(img, () => { 
+        fCanvas.renderAll(); 
+        setContainerSize({ width: finalWidth, height: finalHeight });
+        callbacks.current.onResize(finalWidth);
+      });
+    });
+  }, [page.imageUrl]);
+
+  useEffect(() => {
+    syncCanvasSize();
+    window.addEventListener('resize', syncCanvasSize);
+    return () => window.removeEventListener('resize', syncCanvasSize);
+  }, [syncCanvasSize]);
+
+  useEffect(() => {
+    const fCanvas = fabricCanvasRef.current;
+    if (!fCanvas || containerSize.width === 0) return;
+    isRenderingRef.current = true;
+    const currentObjects = fCanvas.getObjects();
+    const objectIds = page.textObjects.map(t => t.id);
+    currentObjects.forEach((obj: any) => { if (obj.data?.id && !objectIds.includes(obj.data.id)) fCanvas.remove(obj); });
+
+    page.textObjects.forEach((obj) => {
+      const displayContent = cleanText(obj.originalText, hideLabels);
+      let fabricObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id);
+      
+      // Calculate position including padding offsets
+      const posX = ((obj.x / 100) * containerSize.width) + (obj.paddingLeft - obj.paddingRight);
+      const posY = ((obj.y / 100) * containerSize.height) + (obj.paddingTop - obj.paddingBottom);
+
+      const props = {
+        left: posX,
+        top: posY,
+        width: obj.width,
+        fontSize: obj.fontSize,
+        padding: Math.max(obj.paddingTop, obj.paddingRight, obj.paddingBottom, obj.paddingLeft),
+        fill: obj.color,
+        textAlign: 'center',
+        originX: 'center',
+        originY: 'center',
+        stroke: obj.outlineColor,
+        strokeWidth: obj.outlineWidth || 0,
+        strokeUniform: true,
+        paintFirst: 'stroke',
+        fontFamily: obj.fontFamily || 'Inter',
+        text: displayContent,
+        editable: true,
+        shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur || 0, offsetX: 0, offsetY: 0, opacity: obj.glowOpacity, nonScaling: true })
+      };
+
+      if (!fabricObj) {
+        fabricObj = new fabric.Textbox(displayContent, { ...props, data: { id: obj.id }, lockScalingY: true });
+        fCanvas.add(fabricObj);
+      } else {
+        // Important: Update properties only if not currently being edited by user to avoid cursor jumping
+        if (fabricObj !== fCanvas.getActiveObject() || !fabricObj.isEditing) {
+          fabricObj.set(props);
+        } else {
+          // While editing, we only update styling, not the text itself from props
+          fabricObj.set({ 
+            fontSize: props.fontSize, 
+            padding: props.padding,
+            fill: props.fill, 
+            stroke: props.stroke, 
+            strokeWidth: props.strokeWidth, 
+            fontFamily: props.fontFamily, 
+            shadow: props.shadow 
+          }); 
+        }
       }
     });
 
-    return () => fCanvas.dispose();
-  }, [onSelectText, onUpdateText]);
+    const target = fCanvas.getObjects().find((o: any) => o.data?.id === selectedTextId);
+    if (target) { if (fCanvas.getActiveObject() !== target) fCanvas.setActiveObject(target); }
+    else fCanvas.discardActiveObject();
 
-  // Render Image & Text (Dependencies diatur agar klik tidak memicu re-render background)
-  useEffect(() => {
-    if (!fabricCanvasRef.current || containerWidth === 0) return;
-    const fCanvas = fabricCanvasRef.current;
-    
-    fabric.Image.fromURL(page.imageUrl, (img: any) => {
-      if (!img) return;
-      const scale = containerWidth / img.width;
-      fCanvas.setDimensions({ width: img.width * scale, height: img.height * scale });
-      img.set({ scaleX: scale, scaleY: scale, selectable: false, evented: false });
-      
-      fCanvas.setBackgroundImage(img, () => {
-        const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
-        texts.forEach((o: any) => fCanvas.remove(o));
-        
-        page.textObjects.forEach((obj) => {
-          const boxWidth = activeStyle.boxType === 'caption' ? fCanvas.width - (activeStyle.padding * 2) : 280;
-          const tBox = new fabric.Textbox(cleanText(obj.originalText, hideLabels), {
-            left: obj.isManuallyPlaced ? obj.x * fCanvas.width : 0,
-            top: obj.isManuallyPlaced ? obj.y * fCanvas.height : 0,
-            width: boxWidth, fontSize: activeStyle.fontSize, fill: activeStyle.color,
-            textAlign: activeStyle.alignment, fontFamily: activeStyle.fontFamily,
-            stroke: activeStyle.outlineColor, strokeWidth: activeStyle.outlineWidth,
-            strokeUniform: true, paintFirst: 'stroke',
-            backgroundColor: activeStyle.textBackgroundColor !== 'transparent' ? activeStyle.textBackgroundColor : null,
-            data: { id: obj.id, type: 'text', isManuallyPlaced: obj.isManuallyPlaced }, 
-            shadow: new fabric.Shadow({ color: activeStyle.glowColor, blur: activeStyle.glowBlur })
-          });
-          fCanvas.add(tBox);
-        });
-        applyAutoLayout(fCanvas);
-      });
-    }, { crossOrigin: 'anonymous' });
-    // DILARANG memasukkan selectedTextId ke sini agar klik tidak bikin blank
-  }, [page.imageUrl, page.textObjects, activeStyle, hideLabels, applyAutoLayout, containerWidth]);
+    resolveStacking(fCanvas);
+    fCanvas.renderAll();
+    setTimeout(() => { isRenderingRef.current = false; }, 50);
+  }, [page.textObjects, containerSize, hideLabels, selectedTextId, resolveStacking]);
 
-  return (
-    <div ref={containerRef} className="w-full max-w-4xl flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[500px]">
-      <canvas ref={canvasRef} />
-    </div>
-  );
+  return (<div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden shadow-inner border border-slate-800 min-h-[400px]"><canvas ref={canvasRef} /></div>);
 };
 
 export default Editor;

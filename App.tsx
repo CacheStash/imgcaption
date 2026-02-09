@@ -1,28 +1,37 @@
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Page, TextObject, AppState, TextStyle } from './types';
-import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, loadPageFromCache, savePageToCache, cleanText } from './utils/helpers';
+import { Page, TextObject, AppState, TextStyle, ImportMode } from './types';
+// Removed autoWrapText as it is not exported by helpers.ts and not used in this component
+import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
 import Sidebar from './components/Sidebar';
 import Gallery from './components/Gallery';
 import Editor from './components/Editor';
 import Uploader from './components/Uploader';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
 
 declare const fabric: any;
+declare const JSZip: any;
+
+interface HistoryState {
+  past: Page[][];
+  future: Page[][];
+}
 
 const App: React.FC = () => {
-  useEffect(() => {
-    const link = document.createElement('link');
-    link.href = "https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&family=Indie+Flower&family=Inter:wght@400;700&display=swap";
-    link.rel = "stylesheet";
-    document.head.appendChild(link);
-  }, []);
-
+  const [history, setHistory] = useState<HistoryState>({ past: [], future: [] });
+  const [isExporting, setIsExporting] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState(1);
+  
   const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem('comic-editor-state-v5');
+    const saved = localStorage.getItem('comic-editor-state-v10');
     const initial: AppState = {
-      pages: [], hideLabels: false, selectedPageId: null, selectedTextId: null,
-      selectedBubbleId: null, isGalleryView: true, globalStyle: DEFAULT_STYLE, savedStyles: []
+      pages: [],
+      hideLabels: false,
+      importMode: 'box',
+      selectedPageId: null,
+      selectedTextId: null,
+      isGalleryView: true,
+      globalStyle: DEFAULT_STYLE,
+      savedStyles: [],
     };
     if (saved) {
       try {
@@ -33,116 +42,275 @@ const App: React.FC = () => {
     return initial;
   });
 
-  useEffect(() => {
-    state.pages.forEach(p => savePageToCache(p));
+  // Fix: Defined selectedPage and currentPageIndex for global usage in the component body
+  const selectedPage = useMemo(() => 
+    state.pages.find(p => p.id === state.selectedPageId),
+  [state.pages, state.selectedPageId]);
+
+  const currentPageIndex = useMemo(() => 
+    state.pages.findIndex(p => p.id === state.selectedPageId),
+  [state.pages, state.selectedPageId]);
+
+  const recordHistory = useCallback(() => {
+    setHistory(prev => ({
+      past: [...prev.past, JSON.parse(JSON.stringify(state.pages))],
+      future: []
+    }));
   }, [state.pages]);
 
+  const undo = useCallback(() => {
+    if (history.past.length === 0) return;
+    const previous = history.past[history.past.length - 1];
+    const newPast = history.past.slice(0, history.past.length - 1);
+    setHistory({ past: newPast, future: [state.pages, ...history.future] });
+    setState(prev => ({ ...prev, pages: previous }));
+  }, [history, state.pages]);
+
+  const redo = useCallback(() => {
+    if (history.future.length === 0) return;
+    const next = history.future[0];
+    const newFuture = history.future.slice(1);
+    setHistory({ past: [...history.past, state.pages], future: newFuture });
+    setState(prev => ({ ...prev, pages: next }));
+  }, [history, state.pages]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
+  useEffect(() => {
+    localStorage.setItem('comic-editor-state-v10', JSON.stringify({
+      globalStyle: state.globalStyle,
+      savedStyles: state.savedStyles,
+      hideLabels: state.hideLabels,
+      importMode: state.importMode,
+    }));
+  }, [state.globalStyle, state.savedStyles, state.hideLabels, state.importMode]);
+
   const handleUpload = useCallback((files: File[]) => {
-    const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    const newPages: Page[] = sortedFiles.map((file) => {
-      const cached = loadPageFromCache(file.name, file.size);
-      return { id: generateId(), imageUrl: URL.createObjectURL(file), fileName: file.name, fileSize: file.size, textObjects: cached?.textObjects || [], bubbles: [], overrideStyle: cached?.overrideStyle };
-    });
+    recordHistory();
+    const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name));
+    const newPages: Page[] = sortedFiles.map((file) => ({
+      id: generateId(),
+      imageUrl: URL.createObjectURL(file),
+      fileName: file.name,
+      textObjects: [],
+    }));
     setState(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
+  }, [recordHistory]);
+
+  const handleTextImport = useCallback((rawText: string) => {
+    recordHistory();
+    const parsedData = parseRawText(rawText, state.importMode);
+    setState(prev => {
+      const updatedPages = prev.pages.map((page, index) => {
+        const pageNum = index + 1;
+        if (parsedData[pageNum]) {
+          const styleToUse = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
+          const newObjects = parsedData[pageNum].map(txt => createDefaultTextObject(txt, styleToUse));
+          return { ...page, textObjects: [...page.textObjects, ...newObjects] };
+        }
+        return page;
+      });
+      return { ...prev, pages: updatedPages };
+    });
+  }, [recordHistory, state.importMode]);
+
+  const updatePageText = useCallback((pageId: string, textId: string, updates: Partial<TextObject>) => {
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p;
+        return {
+          ...p,
+          textObjects: p.textObjects.map(t => t.id === textId ? { ...t, ...updates } : t)
+        };
+      })
+    }));
   }, []);
 
-  const selectedPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
-  const selectedPage = state.pages[selectedPageIndex] || null;
+  const addTextManually = useCallback((pageId: string) => {
+    recordHistory();
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p;
+        const styleToUse = p.isLocalStyle && p.localStyle ? p.localStyle : prev.globalStyle;
+        const newObj = createDefaultTextObject("New Dialogue", styleToUse);
+        return { ...p, textObjects: [...p.textObjects, newObj] };
+      }),
+      selectedTextId: null 
+    }));
+  }, [recordHistory]);
 
-  const navigatePage = (direction: 'next' | 'prev') => {
-    const newIndex = direction === 'next' ? selectedPageIndex + 1 : selectedPageIndex - 1;
-    if (newIndex >= 0 && newIndex < state.pages.length) {
-      setState(prev => ({ ...prev, selectedPageId: state.pages[newIndex].id, selectedTextId: null }));
+  const handleSelectText = useCallback((id: string | null) => {
+    setState(prev => (prev.selectedTextId === id ? prev : { ...prev, selectedTextId: id }));
+  }, []);
+
+  const clearAllData = useCallback(() => {
+    if (window.confirm("Delete everything?")) {
+      recordHistory();
+      setState(prev => ({ ...prev, pages: [], selectedPageId: null, isGalleryView: true }));
     }
+  }, [recordHistory]);
+
+  const goToPrevPage = useCallback(() => {
+    setState(prev => {
+      const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
+      if (idx > 0) return { ...prev, selectedPageId: prev.pages[idx - 1].id, selectedTextId: null };
+      return prev;
+    });
+  }, []);
+
+  const goToNextPage = useCallback(() => {
+    setState(prev => {
+      const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
+      if (idx >= 0 && idx < prev.pages.length - 1) return { ...prev, selectedPageId: prev.pages[idx + 1].id, selectedTextId: null };
+      return prev;
+    });
+  }, []);
+
+  const updateGlobalStyle = useCallback((newStyle: TextStyle) => {
+    const { x, y } = getPosFromAlign(newStyle.alignment, newStyle.verticalAlignment);
+    setState(prev => {
+      const isLocalActive = prev.selectedPageId && prev.pages.find(p => p.id === prev.selectedPageId)?.isLocalStyle;
+      const newPages = prev.pages.map(page => {
+        if (isLocalActive) {
+          if (page.id !== prev.selectedPageId) return page;
+          return { ...page, localStyle: newStyle, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
+        }
+        if (page.isLocalStyle) return page;
+        return { ...page, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
+      });
+      return { ...prev, globalStyle: isLocalActive ? prev.globalStyle : newStyle, pages: newPages };
+    });
+  }, []);
+
+  const toggleLocalSettings = useCallback((pageId: string) => {
+    recordHistory();
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p;
+        const status = !p.isLocalStyle;
+        return { ...p, isLocalStyle: status, localStyle: status ? JSON.parse(JSON.stringify(prev.globalStyle)) : undefined };
+      })
+    }));
+  }, [recordHistory]);
+
+  const renderToStaticCanvas = async (page: Page) => {
+    const tempCanvas = document.createElement('canvas');
+    const staticCanvas = new fabric.StaticCanvas(tempCanvas);
+    
+    return new Promise<string>((resolve) => {
+      fabric.Image.fromURL(page.imageUrl, (img: any) => {
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        staticCanvas.setDimensions({ width: originalWidth, height: originalHeight });
+        staticCanvas.setBackgroundImage(img, staticCanvas.renderAll.bind(staticCanvas));
+        
+        const scalingFactor = originalWidth / previewWidth;
+
+        page.textObjects.forEach((obj) => {
+          const displayContent = cleanText(obj.originalText, state.hideLabels);
+          // Apply 4-way padding by offsetting position (since Fabric Textbox padding is uniform)
+          const fabricObj = new fabric.Textbox(displayContent, {
+            left: ((obj.x / 100) * originalWidth) + ((obj.paddingLeft - obj.paddingRight) * scalingFactor),
+            top: ((obj.y / 100) * originalHeight) + ((obj.paddingTop - obj.paddingBottom) * scalingFactor),
+            width: obj.width * scalingFactor,
+            fontSize: obj.fontSize * scalingFactor,
+            padding: Math.max(obj.paddingTop, obj.paddingRight, obj.paddingBottom, obj.paddingLeft) * scalingFactor,
+            fill: obj.color,
+            textAlign: 'center',
+            originX: 'center',
+            originY: 'center',
+            stroke: obj.outlineColor,
+            strokeWidth: obj.outlineWidth * scalingFactor,
+            strokeUniform: true,
+            paintFirst: 'stroke',
+            fontFamily: obj.fontFamily || 'Inter',
+            shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur * scalingFactor, offsetX: 0, offsetY: 0, opacity: obj.glowOpacity, nonScaling: true })
+          });
+          staticCanvas.add(fabricObj);
+        });
+        
+        staticCanvas.renderAll();
+        const dataUrl = staticCanvas.toDataURL({ format: 'jpeg', quality: 0.85 });
+        staticCanvas.dispose();
+        resolve(dataUrl);
+      });
+    });
   };
 
-  const handleExportImages = async () => {
+  const handleDownloadSinglePage = async () => {
+    if (!selectedPage) return;
+    setIsExporting(true);
+    try {
+      const dataUrl = await renderToStaticCanvas(selectedPage);
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `page_${currentPageIndex + 1}_${selectedPage.fileName.split('.')[0]}.jpg`;
+      link.click();
+    } catch (e) { alert("Download failed"); } finally { setIsExporting(false); }
+  };
+
+  const handleExportZip = async () => {
     if (state.pages.length === 0) return;
+    setIsExporting(true);
     const zip = new JSZip();
-    const tempCanvas = document.createElement('canvas');
-    const fCanvas = new fabric.StaticCanvas(tempCanvas);
-
-    for (const page of state.pages) {
-      await new Promise<void>((resolve) => {
-        fabric.Image.fromURL(page.imageUrl, (img: any) => {
-          fCanvas.setDimensions({ width: img.width, height: img.height });
-          fCanvas.setBackgroundImage(img, () => {
-            const style = page.overrideStyle || state.globalStyle;
-            const scaleFactor = img.width / 800; 
-
-            page.textObjects.forEach((obj, idx) => {
-              const tBox = new fabric.Textbox(cleanText(obj.originalText, state.hideLabels), {
-                width: style.boxType === 'caption' ? img.width - (style.padding * 2 * scaleFactor) : 320 * scaleFactor,
-                fontSize: style.fontSize * scaleFactor,
-                fill: style.color,
-                textAlign: style.alignment,
-                fontFamily: style.fontFamily,
-                stroke: style.outlineColor,
-                strokeWidth: style.outlineWidth * scaleFactor,
-                shadow: new fabric.Shadow({ color: style.glowColor, blur: style.glowBlur * scaleFactor }),
-                left: obj.isManuallyPlaced ? obj.x * img.width : style.padding * scaleFactor,
-                top: obj.isManuallyPlaced ? obj.y * img.height : (100 * scaleFactor) + (idx * 60 * scaleFactor)
-              });
-              fCanvas.add(tBox);
-            });
-
-            fCanvas.renderAll();
-            zip.file(`edited_${page.fileName}`, fCanvas.toDataURL({ format: 'jpeg', quality: 0.95 }).split(',')[1], { base64: true });
-            fCanvas.clear();
-            resolve();
-          });
-        }, { crossOrigin: 'anonymous' });
-      });
-    }
-    const content = await zip.generateAsync({ type: "blob" });
-    saveAs(content, `ZenReader_Export_${new Date().getTime()}.zip`);
+    try {
+      for (let i = 0; i < state.pages.length; i++) {
+        const page = state.pages[i];
+        const dataUrl = await renderToStaticCanvas(page);
+        zip.file(`${String(i + 1).padStart(3, '0')}_${page.fileName.split('.')[0]}.jpg`, dataUrl.split(',')[1], { base64: true });
+      }
+      const content = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      link.download = `comic_export_${new Date().getTime()}.zip`;
+      link.click();
+    } catch (e) { alert("ZIP Export failed"); } finally { setIsExporting(false); }
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-inter">
+    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
       <Sidebar 
-        state={state} setState={setState} 
-        onExport={handleExportImages}
-        onTextImport={(txt) => {
-          const data = parseRawText(txt);
-          setState(prev => ({ ...prev, pages: prev.pages.map((p, i) => data[i+1] ? {...p, textObjects: data[i+1].map(t => createDefaultTextObject(t, prev.globalStyle))} : p) }));
-        }}
-        onUpdateText={(pId, tId, updates) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === pId ? {...p, textObjects: p.textObjects.map(t => t.id === tId ? {...t, ...updates} : t)} : p)}))}
-        onAddText={(pId) => setState(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pId ? { ...p, textObjects: [...p.textObjects, createDefaultTextObject("New Box", prev.globalStyle)]} : p)}))}
-        onClearAll={() => { localStorage.clear(); window.location.reload(); }}
-        onUpdateGlobalStyle={(s) => setState(p => ({ ...p, globalStyle: s }))}
-        onUpdatePageStyle={(s) => selectedPage && setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
+        state={state} setState={setState} onTextImport={handleTextImport}
+        onUpdateText={updatePageText} onAddText={addTextManually}
+        onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
+        onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
+        onToggleLocal={toggleLocalSettings} isExporting={isExporting}
       />
-      {/* FIXED: Conditional flex centering untuk Uploader */}
-      <main className={`flex-1 relative overflow-auto bg-slate-900 p-8 shadow-inner ${state.pages.length === 0 ? 'flex items-center justify-center' : ''}`}>
-        {state.pages.length === 0 ? <Uploader onUpload={handleUpload} /> : (
-          state.isGalleryView ? <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(p => ({ ...p, selectedPageId: id, isGalleryView: false }))} /> : (
-            <div className="h-full flex flex-col items-center relative">
-              <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700 z-10">
-                <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">← Back</button>
-                <div className="flex items-center gap-4">
-                  <button onClick={() => navigatePage('prev')} disabled={selectedPageIndex === 0} className="px-3 py-1 bg-slate-800 rounded border border-slate-700 text-xs disabled:opacity-30">PREV</button>
-                  <span className="text-xs font-mono text-slate-500">Page {selectedPageIndex + 1} / {state.pages.length}</span>
-                  <button onClick={() => navigatePage('next')} disabled={selectedPageIndex === state.pages.length - 1} className="px-3 py-1 bg-slate-800 rounded border border-slate-700 text-xs disabled:opacity-30">NEXT</button>
+      <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
+        {state.pages.length === 0 ? (
+          <div className="h-full flex items-center justify-center"><Uploader onUpload={handleUpload} /></div>
+        ) : (
+          <>
+            {state.isGalleryView ? (
+              <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(prev => ({ ...prev, selectedPageId: id, isGalleryView: false }))} />
+            ) : (
+              <div className="h-full flex flex-col items-center">
+                <div className="mb-4 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextId: null }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
+                    <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
+                    <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Prev"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+                    <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Next"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
+                    <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
+                    <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
+                    <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Redo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" /></svg></button>
+                  </div>
+                  <div className="flex items-center gap-3"><div className="text-right"><p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p><p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p></div></div>
                 </div>
+                {selectedPage && <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} selectedTextId={state.selectedTextId} onSelectText={handleSelectText} onRecordHistory={recordHistory} onResize={setPreviewWidth} />}
               </div>
-              
-              <div className="flex-1 w-full flex items-center justify-center relative">
-                {selectedPage && (
-                  <Editor 
-                    key={selectedPage.id} // Paksa reset canvas saat ganti halaman
-                    page={selectedPage} 
-                    hideLabels={state.hideLabels}
-                    globalStyle={state.globalStyle}
-                    selectedTextId={state.selectedTextId}
-                    onUpdateText={(tId, updates) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, textObjects: p.textObjects.map(t => t.id === tId ? {...t, ...updates} : t)} : p)}))}
-                    onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
-                    onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
-                  />
-                )}
-              </div>
-            </div>
-          )
+            )}
+          </>
         )}
       </main>
     </div>

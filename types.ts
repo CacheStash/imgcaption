@@ -1,62 +1,55 @@
+
 export type Alignment = 'left' | 'center' | 'right';
 export type VerticalAlignment = 'top' | 'middle' | 'bottom';
-export type BoxType = 'caption' | 'dialogue';
+export type ImportMode = 'full' | 'box';
 
 export interface TextStyle {
   fontSize: number;
+  paddingTop: number;
+  paddingRight: number;
+  paddingBottom: number;
+  paddingLeft: number;
   color: string;
-  alignment: Alignment;
-  verticalAlign: VerticalAlignment;
+  alignment: Alignment; // Horizontal Position
+  verticalAlignment: VerticalAlignment; // Vertical Position
   outlineColor: string;
   outlineWidth: number;
   glowColor: string;
   glowBlur: number;
   glowOpacity: number;
   fontFamily: string;
-  padding: number;
-  boxType: BoxType;
-  textBackgroundColor: string;
 }
 
 export interface TextObject extends TextStyle {
   id: string;
   originalText: string;
-  x: number; 
-  y: number; 
-  width: number;
-  isManuallyPlaced?: boolean; // UNTUK LOCK POSISI DRAG
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  width: number; // pixels
 }
 
-export interface BubbleObject {
+export interface SavedStyle {
   id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  style: 'speech' | 'thought' | 'scream' | 'square';
-  tailPosition: { x: number; y: number };
-  backgroundColor: string;
-  borderColor: string;
-  borderWidth: number;
+  name: string;
+  style: TextStyle;
 }
 
 export interface Page {
   id: string;
   imageUrl: string;
   fileName: string;
-  fileSize: number;
   textObjects: TextObject[];
-  bubbles: BubbleObject[];
-  overrideStyle?: TextStyle;
+  isLocalStyle?: boolean;
+  localStyle?: TextStyle;
 }
 
 export interface AppState {
   pages: Page[];
   hideLabels: boolean;
+  importMode: ImportMode;
   selectedPageId: string | null;
   selectedTextId: string | null;
-  selectedBubbleId: string | null;
   isGalleryView: boolean;
   globalStyle: TextStyle;
-  savedStyles: { id: string; name: string; style: TextStyle }[];
+  savedStyles: SavedStyle[];
 }

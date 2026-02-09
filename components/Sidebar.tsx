@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { AppState, TextObject, Alignment, VerticalAlignment, BoxType, TextStyle } from '../types';
+import { AppState, TextObject, Alignment, VerticalAlignment, TextStyle, ImportMode } from '../types';
 import { FONT_OPTIONS } from '../utils/helpers';
 
 interface SidebarProps {
@@ -10,98 +11,153 @@ interface SidebarProps {
   onAddText: (pageId: string) => void;
   onClearAll: () => void;
   onUpdateGlobalStyle: (style: TextStyle) => void;
-  onUpdatePageStyle: (style: TextStyle | undefined) => void;
-  onExport: () => void;
+  onExportZip: () => void;
+  onDownloadSingle: () => void;
+  onToggleLocal: (pageId: string) => void;
+  isExporting: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  state, setState, onTextImport, onUpdateText, onAddText, onClearAll, onUpdateGlobalStyle, onUpdatePageStyle, onExport 
+  state, setState, onTextImport, onUpdateText, onAddText, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting
 }) => {
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
-  const isUsingOverride = !!selectedPage?.overrideStyle;
-  const currentStyle = selectedPage?.overrideStyle || state.globalStyle;
+  const selectedText = selectedPage?.textObjects.find(t => t.id === state.selectedTextId);
+  const activeStyle = (selectedPage?.isLocalStyle && selectedPage.localStyle) ? selectedPage.localStyle : state.globalStyle;
 
-  const handleStyleChange = (updates: Partial<TextStyle>) => {
-    const newStyle = { ...currentStyle, ...updates };
-    if (isUsingOverride) onUpdatePageStyle(newStyle);
-    else onUpdateGlobalStyle(newStyle);
+  const updateActiveStyle = (updates: Partial<TextStyle>) => {
+    onUpdateGlobalStyle({ ...activeStyle, ...updates });
   };
 
-  return (
-    <aside className="w-80 border-r border-slate-800 flex flex-col bg-slate-950 p-6 space-y-6 overflow-y-auto">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">ZenReader Pro</h1>
-          <button onClick={onClearAll} className="p-2 text-slate-600 hover:text-red-500 transition-colors text-xs font-bold">RESET</button>
+  const renderStyleEditor = (style: TextStyle) => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Color</label>
+          <input type="color" value={style.color} onChange={(e) => updateActiveStyle({ color: e.target.value })} className="w-full h-8 rounded bg-slate-900 border border-slate-700" />
         </div>
-
-        <button 
-          onClick={onExport}
-          disabled={state.pages.length === 0}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 rounded-xl text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2"
-        >
-          <span>🖼️</span> EXPORT ZIP (IMAGES)
-        </button>
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Font</label>
+          <select value={style.fontFamily} onChange={(e) => updateActiveStyle({ fontFamily: e.target.value })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-1">
+            {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
+          </select>
+        </div>
       </div>
 
-      <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-4">
-        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Typography</h3>
-        <select value={currentStyle.fontFamily} onChange={(e) => handleStyleChange({ fontFamily: e.target.value })} className="w-full h-8 bg-slate-950 border border-slate-700 rounded text-xs px-2 outline-none text-white">
-          {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
-        </select>
+      <div className="grid grid-cols-1 gap-2">
+        <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Font Size</label>
+        <input type="number" value={style.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-2" />
+      </div>
+
+      <div className="border-t border-slate-800 pt-3">
+        <label className="block text-[10px] text-slate-400 mb-2 font-bold uppercase">Box Offset / Padding</label>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col">
+            <span className="text-[9px] text-slate-500 uppercase">Top</span>
+            <input type="number" value={style.paddingTop} onChange={(e) => updateActiveStyle({ paddingTop: Number(e.target.value) })} className="h-7 bg-slate-900 border border-slate-700 rounded text-[10px] px-1" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-slate-500 uppercase">Bottom</span>
+            <input type="number" value={style.paddingBottom} onChange={(e) => updateActiveStyle({ paddingBottom: Number(e.target.value) })} className="h-7 bg-slate-900 border border-slate-700 rounded text-[10px] px-1" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-slate-500 uppercase">Left</span>
+            <input type="number" value={style.paddingLeft} onChange={(e) => updateActiveStyle({ paddingLeft: Number(e.target.value) })} className="h-7 bg-slate-900 border border-slate-700 rounded text-[10px] px-1" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-slate-500 uppercase">Right</span>
+            <input type="number" value={style.paddingRight} onChange={(e) => updateActiveStyle({ paddingRight: Number(e.target.value) })} className="h-7 bg-slate-900 border border-slate-700 rounded text-[10px] px-1" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col">
+        <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">H-Pos</label>
+        <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden">
+          {(['left', 'center', 'right'] as Alignment[]).map((align) => (
+            <button key={align} onClick={() => updateActiveStyle({ alignment: align })} className={`flex-1 text-[10px] uppercase font-bold ${style.alignment === align ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{align[0]}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col">
+        <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">V-Pos</label>
+        <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden">
+          {(['top', 'middle', 'bottom'] as VerticalAlignment[]).map((vAlign) => (
+            <button key={vAlign} onClick={() => updateActiveStyle({ verticalAlignment: vAlign })} className={`flex-1 text-[10px] uppercase font-bold ${style.verticalAlignment === vAlign ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{vAlign[0]}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-slate-800 pt-3">
+        <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Outline</label>
         <div className="flex gap-2">
-          <input type="color" value={currentStyle.color} onChange={(e) => handleStyleChange({ color: e.target.value })} className="w-10 h-8 bg-transparent border-none cursor-pointer" />
-          <input type="number" value={currentStyle.fontSize} onChange={(e) => handleStyleChange({ fontSize: Number(e.target.value) })} className="flex-1 h-8 bg-slate-950 border border-slate-700 rounded text-xs px-2 text-white" />
+          <input type="color" value={style.outlineColor} onChange={(e) => updateActiveStyle({ outlineColor: e.target.value })} className="w-8 h-8 rounded bg-slate-900 border border-slate-700" />
+          <input type="range" min="0" max="15" value={style.outlineWidth} onChange={(e) => updateActiveStyle({ outlineWidth: Number(e.target.value) })} className="flex-1 accent-blue-500" />
         </div>
-      </section>
+      </div>
+    </div>
+  );
 
-      <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-3">
-        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Outline & Glow</h3>
-        <div className="flex items-center gap-3">
-          <input type="color" value={currentStyle.outlineColor} onChange={(e) => handleStyleChange({ outlineColor: e.target.value })} className="w-6 h-6 bg-transparent" />
-          <input type="range" min="0" max="15" value={currentStyle.outlineWidth} onChange={(e) => handleStyleChange({ outlineWidth: Number(e.target.value) })} className="flex-1" />
+  return (
+    <aside className="w-80 border-r border-slate-800 flex flex-col bg-slate-950">
+      <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">Comic Editor</h1>
+        <div className="flex gap-2">
+          <button onClick={onExportZip} disabled={isExporting} className="p-2 text-slate-400 hover:text-green-500"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4-4v12" /></svg></button>
+          <button onClick={onClearAll} className="p-2 text-slate-400 hover:text-red-500"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
         </div>
-        <div className="flex items-center gap-3">
-          <input type="color" value={currentStyle.glowColor} onChange={(e) => handleStyleChange({ glowColor: e.target.value })} className="w-6 h-6 bg-transparent" />
-          <input type="range" min="0" max="30" value={currentStyle.glowBlur} onChange={(e) => handleStyleChange({ glowBlur: Number(e.target.value) })} className="flex-1" />
-        </div>
-      </section>
-
-      <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-4">
-        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Layout & Padding</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <select value={currentStyle.alignment} onChange={(e) => handleStyleChange({ alignment: e.target.value as Alignment })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px] px-1 text-white">
-            <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
-          </select>
-          <select value={currentStyle.verticalAlign} onChange={(e) => handleStyleChange({ verticalAlign: e.target.value as VerticalAlignment })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px] px-1 text-white">
-            <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
-          </select>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <input type="number" value={currentStyle.padding} onChange={(e) => handleStyleChange({ padding: Number(e.target.value) })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px] px-2 text-white" placeholder="Padding" />
-          <select value={currentStyle.boxType} onChange={(e) => handleStyleChange({ boxType: e.target.value as BoxType })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px] px-1 text-white">
-            <option value="caption">Full Width</option><option value="dialogue">Boxed</option>
-          </select>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-900/40 rounded-lg border border-slate-800 hover:bg-slate-800 transition-colors">
-          <input type="checkbox" checked={state.hideLabels} onChange={(e) => setState(p => ({ ...p, hideLabels: e.target.checked }))} className="w-4 h-4 rounded border-slate-700 bg-slate-900" />
-          <span className="text-xs text-slate-300">Hide Character Name</span>
-        </label>
-        {selectedPage && (
-          <label className="flex items-center gap-3 p-3 bg-blue-900/10 border border-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/20 transition-colors">
-            <input type="checkbox" checked={isUsingOverride} onChange={(e) => onUpdatePageStyle(e.target.checked ? state.globalStyle : undefined)} className="w-4 h-4" />
-            <span className="text-xs text-blue-400 font-bold">Custom Style Page</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <section className="bg-blue-900/10 p-4 rounded-xl border border-blue-900/30 space-y-3">
+          <h3 className="text-xs font-bold text-blue-400 uppercase">General</h3>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={state.hideLabels} onChange={(e) => setState(prev => ({ ...prev, hideLabels: e.target.checked }))} className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500" />
+            <span className="text-xs text-slate-300">Hide Character Names</span>
           </label>
-        )}
-      </section>
+          <div className="space-y-1">
+            <span className="text-[10px] text-blue-400 font-bold uppercase">Parsing Mode</span>
+            <div className="flex bg-slate-800 rounded p-1">
+              <button onClick={() => setState(prev => ({ ...prev, importMode: 'box' }))} className={`flex-1 py-1 text-[9px] font-bold rounded ${state.importMode === 'box' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>Merged Box</button>
+              <button onClick={() => setState(prev => ({ ...prev, importMode: 'full' }))} className={`flex-1 py-1 text-[9px] font-bold rounded ${state.importMode === 'full' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Full Width</button>
+            </div>
+          </div>
+          {selectedPage && !state.isGalleryView && (
+            <button onClick={() => onToggleLocal(selectedPage.id)} className={`w-full py-2 text-[10px] font-bold rounded border transition-colors ${selectedPage.isLocalStyle ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
+              {selectedPage.isLocalStyle ? 'LOCAL OVERRIDE ACTIVE' : 'USE GLOBAL SETTINGS'}
+            </button>
+          )}
+        </section>
 
-      <section>
-        <h3 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Import Text</h3>
-        <textarea placeholder="Page 1 - Dialog..." className="w-full h-32 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs outline-none focus:ring-1 focus:ring-blue-500 transition-shadow" onBlur={(e) => onTextImport(e.target.value)} />
-      </section>
+        <section className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50">
+          <h3 className="text-xs font-bold text-slate-500 uppercase mb-4">{selectedPage?.isLocalStyle ? 'Local Style' : 'Global Style'}</h3>
+          {renderStyleEditor(activeStyle)}
+        </section>
+
+        <section className="space-y-2">
+          {selectedPage && !state.isGalleryView && (
+            <button onClick={onDownloadSingle} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg">Download Current Page</button>
+          )}
+          <button onClick={onExportZip} disabled={isExporting || state.pages.length === 0} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-bold shadow-lg">Export All ZIP</button>
+        </section>
+
+        <section>
+          <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Import Text</h3>
+          <textarea placeholder="Page 1 - Character: Text..." className="w-full h-24 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs outline-none focus:ring-1 focus:ring-blue-500" onBlur={(e) => onTextImport(e.target.value)} />
+          <p className="text-[9px] text-slate-600 mt-1 italic">* Merged Box puts all page dialogue in one box.</p>
+        </section>
+
+        {selectedPage && (
+          <section className="p-4 border border-slate-800 rounded-xl bg-slate-900/20">
+            <button onClick={() => onAddText(selectedPage.id)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">+ Manual Text Box</button>
+            {selectedText && (
+              <div className="mt-4 space-y-3">
+                <textarea value={selectedText.originalText} onChange={(e) => onUpdateText(selectedPage.id, selectedText.id, { originalText: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-xs h-24 outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+      <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold">v2.0.1 Pro</div>
     </aside>
   );
 };
