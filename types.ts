@@ -25,15 +25,13 @@ export interface TextObject extends TextStyle {
   width: number; 
 }
 
-export type BubbleStyle = 'speech' | 'thought' | 'scream' | 'square';
-
 export interface BubbleObject {
   id: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  style: BubbleStyle;
+  style: 'speech' | 'thought' | 'scream' | 'square';
   tailPosition: { x: number; y: number };
   backgroundColor: string;
   borderColor: string;
@@ -46,6 +44,7 @@ export interface Page {
   fileName: string;
   textObjects: TextObject[];
   bubbles: BubbleObject[];
+  overrideStyle?: TextStyle; // Fitur Baru: Override per halaman
 }
 
 export interface SavedStyle {
