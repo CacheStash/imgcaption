@@ -73,6 +73,7 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     setIsMaskMode(false);
   }, [isMaskMode]);
 
+  // Inisialisasi Canvas
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { backgroundColor: '#0f172a', preserveObjectStacking: true });
@@ -83,9 +84,11 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     return () => fCanvas.dispose();
   }, [isMaskMode, addSmartMask, onSelectText]);
 
+  // Render Image & Text
   useEffect(() => {
     if (!fabricCanvasRef.current || containerWidth === 0) return;
     const fCanvas = fabricCanvasRef.current;
+    
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
       if (!img) return;
       const scale = containerWidth / img.width;
@@ -93,17 +96,29 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
       const finalH = img.height * scale;
       fCanvas.setDimensions({ width: finalW, height: finalH });
       img.set({ scaleX: scale, scaleY: scale, selectable: false, evented: false });
+      
       fCanvas.setBackgroundImage(img, () => {
-        const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
-        texts.forEach((o: any) => fCanvas.remove(o));
+        // Hapus objek teks lama sebelum re-render
+        const oldTexts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
+        oldTexts.forEach((o: any) => fCanvas.remove(o));
+
         page.textObjects.forEach((obj) => {
-          // --- FIX WRAPPED TEXT LOGIC ---
-          const boxWidth = activeStyle.boxType === 'caption' ? finalW - (activeStyle.padding * 2) : 300;
+          // FIX TYPOGRAPHY & COLOR: Gunakan activeStyle untuk merespons perubahan global/override
+          const boxWidth = activeStyle.boxType === 'caption' ? finalW - (activeStyle.padding * 2) : 280;
+          
           const tBox = new fabric.Textbox(cleanText(obj.originalText, hideLabels), {
-            width: boxWidth, fontSize: obj.fontSize, fill: obj.color, textAlign: obj.alignment, fontFamily: obj.fontFamily,
-            stroke: obj.outlineColor, strokeWidth: obj.outlineWidth, strokeUniform: true, paintFirst: 'stroke',
-            backgroundColor: obj.textBackgroundColor !== 'transparent' ? obj.textBackgroundColor : null,
-            data: { id: obj.id, type: 'text' }, shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur })
+            width: boxWidth, 
+            fontSize: activeStyle.fontSize, // Pakai activeStyle
+            fill: activeStyle.color,        // Pakai activeStyle
+            textAlign: activeStyle.alignment, 
+            fontFamily: activeStyle.fontFamily, // Pakai activeStyle
+            stroke: activeStyle.outlineColor, 
+            strokeWidth: activeStyle.outlineWidth, 
+            strokeUniform: true, 
+            paintFirst: 'stroke',
+            backgroundColor: activeStyle.textBackgroundColor !== 'transparent' ? activeStyle.textBackgroundColor : null,
+            data: { id: obj.id, type: 'text' }, 
+            shadow: new fabric.Shadow({ color: activeStyle.glowColor, blur: activeStyle.glowBlur })
           });
           fCanvas.add(tBox);
         });
@@ -115,18 +130,9 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   return (
     <div className="w-full flex flex-col items-center gap-4">
       <div className="flex gap-2 bg-slate-800 p-2 rounded-xl border border-slate-700 shadow-lg">
-        <button 
-          onClick={() => setIsMaskMode(!isMaskMode)} 
-          className={`px-4 h-8 rounded text-xs font-bold transition-all ${isMaskMode ? 'bg-blue-600' : 'bg-slate-900 text-blue-400 border border-blue-900/50 hover:bg-slate-800'}`}
-        >
-          {isMaskMode ? 'Click on Balloon...' : '+ SMART MASK'}
-        </button>
+        <button onClick={() => setIsMaskMode(!isMaskMode)} className={`px-4 h-8 rounded text-xs font-bold transition-all ${isMaskMode ? 'bg-blue-600' : 'bg-slate-900 text-blue-400 border border-blue-900/50 hover:bg-slate-800'}`}>+ SMART MASK</button>
         <div className="w-px h-6 bg-slate-700 mx-1"></div>
-        <select 
-          value={activeStyle.fontFamily} 
-          onChange={(e) => onUpdateOverride({...activeStyle, fontFamily: e.target.value})} 
-          className="bg-slate-900 text-[10px] px-2 h-8 rounded outline-none border border-slate-700 text-slate-200"
-        >
+        <select value={activeStyle.fontFamily} onChange={(e) => onUpdateOverride({...activeStyle, fontFamily: e.target.value})} className="bg-slate-900 text-[10px] px-2 h-8 rounded border border-slate-700 outline-none text-slate-200">
           {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
         </select>
       </div>
