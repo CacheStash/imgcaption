@@ -15,6 +15,7 @@ export interface TextStyle {
   fontFamily: string;
   padding: number;
   boxType: BoxType;
+  textBackgroundColor: string; // FITUR BARU: Penimpa balon
 }
 
 export interface TextObject extends TextStyle {
@@ -25,26 +26,13 @@ export interface TextObject extends TextStyle {
   width: number; 
 }
 
-export interface BubbleObject {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  style: 'speech' | 'thought' | 'scream' | 'square';
-  tailPosition: { x: number; y: number };
-  backgroundColor: string;
-  borderColor: string;
-  borderWidth: number;
-}
-
 export interface Page {
   id: string;
   imageUrl: string;
   fileName: string;
-  fileSize: number; // Tambahan untuk identifikasi cache
+  fileSize: number; // Untuk identifikasi cache
   textObjects: TextObject[];
-  bubbles: BubbleObject[];
+  bubbles: any[];
   overrideStyle?: TextStyle;
 }
 

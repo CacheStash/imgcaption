@@ -10,7 +10,7 @@ interface SidebarProps {
   onAddText: (pageId: string) => void;
   onClearAll: () => void;
   onUpdateGlobalStyle: (style: TextStyle) => void;
-  onUpdatePageStyle: (style: TextStyle | undefined) => void; // PROPS BARU
+  onUpdatePageStyle: (style: TextStyle | undefined) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -28,68 +28,57 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-80 border-r border-slate-800 flex flex-col bg-slate-950">
-      <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">ZenReader Pro</h1>
-        <button onClick={onClearAll} className="p-2 hover:bg-red-900/20 text-slate-600 hover:text-red-500 rounded-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-        </button>
-      </div>
+    <aside className="w-80 border-r border-slate-800 flex flex-col bg-slate-950 p-6 space-y-6 overflow-y-auto">
+      <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">ZenReader Pro</h1>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Toggle Hide Labels */}
-        <section className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={state.hideLabels} onChange={(e) => setState(p => ({ ...p, hideLabels: e.target.checked }))} className="w-4 h-4" />
-            <span className="text-sm text-slate-300">Hide Character Name</span>
-          </label>
-        </section>
+      {/* TYPOGRAPHY */}
+      <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-4">
+        <h3 className="text-[10px] font-bold text-slate-500 uppercase">Typography</h3>
+        <select value={currentStyle.fontFamily} onChange={(e) => handleStyleChange({ fontFamily: e.target.value })} className="w-full h-8 bg-slate-950 border border-slate-700 rounded text-xs px-2">
+          {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
+        </select>
+        <div className="flex gap-2">
+          <input type="color" value={currentStyle.color} onChange={(e) => handleStyleChange({ color: e.target.value })} className="w-10 h-8 bg-transparent cursor-pointer" />
+          <input type="number" value={currentStyle.fontSize} onChange={(e) => handleStyleChange({ fontSize: Number(e.target.value) })} className="flex-1 h-8 bg-slate-950 border border-slate-700 rounded text-xs px-2" />
+        </div>
+      </section>
 
-        {/* Override Toggle (FITUR BARU) */}
-        {selectedPage && (
-          <section className="bg-blue-900/10 p-4 rounded-xl border border-blue-900/30">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={isUsingOverride} onChange={(e) => onUpdatePageStyle(e.target.checked ? state.globalStyle : undefined)} className="w-4 h-4" />
-              <span className="text-sm text-blue-400 font-bold">Custom Style Per Page</span>
-            </label>
-          </section>
-        )}
+      {/* SMART BALLOON RE-FILL */}
+      <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-3">
+        <h3 className="text-[10px] font-bold text-slate-500 uppercase">Smart Balloon Re-fill</h3>
+        <div className="flex items-center gap-3">
+          <input type="color" value={currentStyle.textBackgroundColor} onChange={(e) => handleStyleChange({ textBackgroundColor: e.target.value })} className="w-8 h-8 bg-transparent" />
+          <span className="text-xs text-slate-300">Mask Color</span>
+          <button onClick={() => handleStyleChange({ textBackgroundColor: 'transparent' })} className="text-[9px] text-blue-400 underline ml-auto">Clear</button>
+        </div>
+      </section>
 
-        {/* Layout Editor */}
-        <section className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50 space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] text-slate-500 mb-1">H-Align</label>
-              <select value={currentStyle.alignment} onChange={(e) => handleStyleChange({ alignment: e.target.value as Alignment })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-1">
-                <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] text-slate-500 mb-1">V-Align</label>
-              <select value={currentStyle.verticalAlign} onChange={(e) => handleStyleChange({ verticalAlign: e.target.value as VerticalAlignment })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-1">
-                <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] text-slate-500 mb-1">Safe Area</label>
-              <input type="number" value={currentStyle.padding} onChange={(e) => handleStyleChange({ padding: Number(e.target.value) })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-2" />
-            </div>
-            <div>
-              <label className="block text-[10px] text-slate-500 mb-1">Box Type</label>
-              <select value={currentStyle.boxType} onChange={(e) => handleStyleChange({ boxType: e.target.value as BoxType })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-1">
-                <option value="caption">Full Width</option><option value="dialogue">Boxed</option>
-              </select>
-            </div>
-          </div>
-        </section>
+      {/* LAYOUT */}
+      <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-4">
+        <div className="grid grid-cols-2 gap-2">
+          <select value={currentStyle.alignment} onChange={(e) => handleStyleChange({ alignment: e.target.value as Alignment })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px]">
+            <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+          </select>
+          <select value={currentStyle.verticalAlign} onChange={(e) => handleStyleChange({ verticalAlign: e.target.value as VerticalAlignment })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px]">
+            <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input type="number" value={currentStyle.padding} onChange={(e) => handleStyleChange({ padding: Number(e.target.value) })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px] px-2" placeholder="Safe Area" />
+          <select value={currentStyle.boxType} onChange={(e) => handleStyleChange({ boxType: e.target.value as BoxType })} className="h-8 bg-slate-950 border border-slate-700 rounded text-[10px]">
+            <option value="caption">Full Width</option><option value="dialogue">Boxed</option>
+          </select>
+        </div>
+      </section>
 
-        <section>
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Import Text</h3>
-          <textarea placeholder="Page 1 - Text..." className="w-full h-24 bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm resize-none" onBlur={(e) => onTextImport(e.target.value)} />
-        </section>
-      </div>
+      {selectedPage && (
+        <label className="flex items-center gap-3 p-3 bg-blue-900/10 border border-blue-900/30 rounded-lg cursor-pointer">
+          <input type="checkbox" checked={isUsingOverride} onChange={(e) => onUpdatePageStyle(e.target.checked ? state.globalStyle : undefined)} className="w-4 h-4" />
+          <span className="text-xs text-blue-400 font-bold">Custom Style Page</span>
+        </label>
+      )}
+
+      <textarea placeholder="Import Text (Page 1 - Dialog...)" className="w-full h-32 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs outline-none" onBlur={(e) => onTextImport(e.target.value)} />
     </aside>
   );
 };
