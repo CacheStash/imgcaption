@@ -77,7 +77,15 @@ const App: React.FC = () => {
     }));
   }, []);
 
-  const selectedPage = useMemo(() => state.pages.find(p => p.id === state.selectedPageId) || null, [state.pages, state.selectedPageId]);
+  const selectedPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
+  const selectedPage = state.pages[selectedPageIndex] || null;
+
+  const navigatePage = (direction: 'next' | 'prev') => {
+    const newIndex = direction === 'next' ? selectedPageIndex + 1 : selectedPageIndex - 1;
+    if (newIndex >= 0 && newIndex < state.pages.length) {
+      setState(prev => ({ ...prev, selectedPageId: state.pages[newIndex].id, selectedTextId: null }));
+    }
+  };
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
@@ -90,7 +98,12 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
-        {state.pages.length === 0 ? <Uploader onUpload={handleUpload} /> : (
+        {state.pages.length === 0 ? (
+          /* FITUR LAMA: Centered Uploader */
+          <div className="h-full flex items-center justify-center">
+            <Uploader onUpload={handleUpload} />
+          </div>
+        ) : (
           state.isGalleryView ? (
             <Gallery 
               pages={state.pages} 
@@ -99,12 +112,29 @@ const App: React.FC = () => {
             />
           ) : (
             <div className="h-full flex flex-col items-center">
-              <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="mb-4 px-4 py-2 bg-slate-800 rounded-lg self-start">← Back</button>
+              {/* FITUR LAMA: Navigasi & Undo/Redo Toolbar */}
+              <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                <div className="flex gap-2">
+                  <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors">← Back</button>
+                  <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-1 border border-slate-700">
+                    <button onClick={() => navigatePage('prev')} disabled={selectedPageIndex === 0} className="p-2 hover:bg-slate-800 disabled:opacity-30 rounded px-3">PREV</button>
+                    <span className="px-3 text-xs font-mono text-slate-400">{selectedPageIndex + 1} / {state.pages.length}</span>
+                    <button onClick={() => navigatePage('next')} disabled={selectedPageIndex === state.pages.length - 1} className="p-2 hover:bg-slate-800 disabled:opacity-30 rounded px-3">NEXT</button>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button className="px-3 py-1 bg-slate-900 hover:bg-slate-700 rounded border border-slate-700 text-[10px]">UNDO</button>
+                  <button className="px-3 py-1 bg-slate-900 hover:bg-slate-700 rounded border border-slate-700 text-[10px]">REDO</button>
+                  <button onClick={() => window.location.reload()} className="px-3 py-1 bg-red-900/20 text-red-400 hover:bg-red-900/40 rounded border border-red-900/50 text-[10px]">RESET PAGE</button>
+                </div>
+              </div>
+
               {selectedPage && (
                 <Editor 
                   page={selectedPage} 
                   hideLabels={state.hideLabels}
-                  globalStyle={state.globalStyle} // INI YANG TADI KURANG
+                  globalStyle={state.globalStyle} // FITUR BARU: Tetap ada
                   onUpdateText={(textId, updates) => updatePageText(selectedPage.id, textId, updates)}
                   selectedTextId={state.selectedTextId}
                   onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
