@@ -1,7 +1,7 @@
+// FULL REWRITE - Memastikan pengiriman data style tetap terisolasi 
 import React from 'react';
 import { AppState, TextObject, Alignment, VerticalAlignment, TextStyle, ImportMode } from '../types';
 import { FONT_OPTIONS } from '../utils/helpers';
-import Uploader from './Uploader';
 
 interface SidebarProps {
   state: AppState;
@@ -15,11 +15,10 @@ interface SidebarProps {
   onDownloadSingle: () => void;
   onToggleLocal: (pageId: string) => void;
   isExporting: boolean;
-  onUpload: (files: File[]) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  state, setState, onTextImport, onUpdateText, onAddText, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onUpload
+  state, setState, onTextImport, onUpdateText, onAddText, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting
 }) => {
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
   const selectedText = selectedPage?.textObjects.find(t => t.id === state.selectedTextId);
@@ -50,7 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="border-t border-slate-800 pt-3">
-        <label className="block text-[10px] text-slate-400 mb-2 font-bold uppercase">Global Page Padding (Boundary)</label>
+        <label className="block text-[10px] text-slate-400 mb-2 font-bold uppercase">Boundary / Global Padding</label>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col">
             <span className="text-[9px] text-slate-500 uppercase">Top</span>
@@ -104,32 +103,38 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-6 border-b border-slate-800 flex items-center justify-between">
         <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">Comic Editor</h1>
         <div className="flex gap-2">
-          <button onClick={onExportZip} disabled={isExporting} title="Export All" className="p-2 text-slate-400 hover:text-green-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4-4v12" /></svg></button>
-          <button onClick={onClearAll} title="Clear All Data" className="p-2 text-slate-400 hover:text-red-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+          <button onClick={onExportZip} disabled={isExporting} className="p-2 text-slate-400 hover:text-green-500 transition-colors" title="Export All"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4-4v12" /></svg></button>
+          <button onClick={onClearAll} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Delete All"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
         </div>
       </div>
 
-      <div className="px-6 py-4 border-b border-slate-900/50 bg-slate-900/10">
-        <Uploader onUpload={onUpload} />
-      </div>
-
       <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-800">
-        <section className="bg-blue-900/10 p-4 rounded-xl border border-blue-900/30 space-y-3">
-          <h3 className="text-xs font-bold text-blue-400 uppercase">General</h3>
+        <section className="bg-blue-600/5 p-4 rounded-xl border border-blue-600/20">
+          <h3 className="text-xs font-bold text-blue-400 uppercase mb-3">Import Text Dialog</h3>
+          <textarea 
+            placeholder="Page 1 - Lara: Dialog...&#10;Otto: Dialog..." 
+            className="w-full h-32 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs outline-none focus:ring-1 focus:ring-blue-500 resize-none transition-all" 
+            onBlur={(e) => onTextImport(e.target.value)} 
+          />
+          <p className="text-[9px] text-slate-600 mt-2 italic">* Use 'Box Text' to group dialogue per page.</p>
+        </section>
+
+        <section className="bg-slate-900/40 p-4 rounded-xl border border-blue-900/10 space-y-3">
+          <h3 className="text-xs font-bold text-slate-500 uppercase">General Settings</h3>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={state.hideLabels} onChange={(e) => setState(prev => ({ ...prev, hideLabels: e.target.checked }))} className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500" />
-            <span className="text-xs text-slate-300 font-medium">Hide Character Names</span>
+            <input type="checkbox" checked={state.hideLabels} onChange={(e) => setState(prev => ({ ...prev, hideLabels: e.target.checked }))} className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600" />
+            <span className="text-xs text-slate-400">Hide Character Names</span>
           </label>
           <div className="space-y-1">
-            <span className="text-[10px] text-blue-400 font-bold uppercase">Text Layout Mode</span>
+            <span className="text-[10px] text-slate-600 font-bold uppercase">Parsing Mode</span>
             <div className="flex bg-slate-800 rounded p-1">
-              <button onClick={() => setState(prev => ({ ...prev, importMode: 'box' }))} className={`flex-1 py-1.5 text-[9px] font-bold rounded transition-all ${state.importMode === 'box' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>BOX TEXT</button>
-              <button onClick={() => setState(prev => ({ ...prev, importMode: 'full' }))} className={`flex-1 py-1.5 text-[9px] font-bold rounded transition-all ${state.importMode === 'full' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>FULL WIDTH</button>
+              <button onClick={() => setState(prev => ({ ...prev, importMode: 'box' }))} className={`flex-1 py-1 text-[9px] font-bold rounded transition-all ${state.importMode === 'box' ? 'bg-blue-600 text-white shadow' : 'text-slate-500'}`}>BOX TEXT</button>
+              <button onClick={() => setState(prev => ({ ...prev, importMode: 'full' }))} className={`flex-1 py-1 text-[9px] font-bold rounded transition-all ${state.importMode === 'full' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500'}`}>FULL WIDTH</button>
             </div>
           </div>
           {selectedPage && !state.isGalleryView && (
-            <button onClick={() => onToggleLocal(selectedPage.id)} className={`w-full py-2 text-[10px] font-bold rounded border transition-colors ${selectedPage.isLocalStyle ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
-              {selectedPage.isLocalStyle ? 'LOCAL SETTINGS ACTIVE' : 'USE GLOBAL SETTINGS'}
+            <button onClick={() => onToggleLocal(selectedPage.id)} className={`w-full py-2 text-[10px] font-bold rounded border transition-colors ${selectedPage.isLocalStyle ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
+              {selectedPage.isLocalStyle ? 'LOCAL OVERRIDE ACTIVE' : 'USE GLOBAL STYLE'}
             </button>
           )}
         </section>
@@ -143,28 +148,22 @@ const Sidebar: React.FC<SidebarProps> = ({
           {selectedPage && !state.isGalleryView && (
             <button onClick={onDownloadSingle} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95">Download Page</button>
           )}
-          <button onClick={onExportZip} disabled={isExporting || state.pages.length === 0} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95 disabled:opacity-30 disabled:grayscale">Export All ZIP</button>
-        </section>
-
-        <section>
-          <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Import Text Content</h3>
-          <textarea placeholder="Page 1 - Character: Dialogue text..." className="w-full h-32 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs outline-none focus:ring-1 focus:ring-blue-500 resize-none" onBlur={(e) => onTextImport(e.target.value)} />
-          <p className="text-[9px] text-slate-600 mt-2 italic">* Box mode: formatted block per character. Full mode: continuous flow.</p>
+          <button onClick={onExportZip} disabled={isExporting || state.pages.length === 0} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95 disabled:opacity-30">Export All ZIP</button>
         </section>
 
         {selectedPage && (
           <section className="p-4 border border-slate-800 rounded-xl bg-slate-900/20 space-y-3">
-            <button onClick={() => onAddText(selectedPage.id)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-500">+ Manual Text Box</button>
+            <button onClick={() => onAddText(selectedPage.id)} className="w-full py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">+ Manual Text Box</button>
             {selectedText && (
               <div className="space-y-2 pt-2 border-t border-slate-800">
-                <span className="text-[10px] text-slate-500 font-bold uppercase">Edit Text</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase">Quick Edit Text</span>
                 <textarea value={selectedText.originalText} onChange={(e) => onUpdateText(selectedPage.id, selectedText.id, { originalText: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-xs h-24 outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
               </div>
             )}
           </section>
         )}
       </div>
-      <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold bg-slate-950">v2.0.2 Pro</div>
+      <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold">v2.0.4 Pro</div>
     </aside>
   );
 };

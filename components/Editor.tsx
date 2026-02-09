@@ -1,3 +1,4 @@
+// FULL REWRITE - Memperbaiki Boundary Clamping untuk wrapped text 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Page, TextObject, ImportMode } from '../types';
 import { cleanText } from '../utils/helpers';
@@ -28,21 +29,17 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, impor
   const resolveStacking = useCallback((fCanvas: any) => {
     const textboxes = fCanvas.getObjects().filter((o: any) => o.data?.id);
     if (textboxes.length <= 1) return;
-
     textboxes.sort((a: any, b: any) => a.top - b.top);
     const PADDING = 15;
     let changed = false;
-
     for (let i = 0; i < textboxes.length; i++) {
       const current = textboxes[i];
       const currentRect = current.getBoundingRect();
-
       for (let j = 0; j < i; j++) {
         const above = textboxes[j];
         const aboveRect = above.getBoundingRect();
         const overlapX = (currentRect.left < aboveRect.left + aboveRect.width) && 
                          (currentRect.left + currentRect.width > aboveRect.left);
-        
         if (overlapX && currentRect.top < aboveRect.top + aboveRect.height + PADDING) {
           current.set({ top: aboveRect.top + aboveRect.height + PADDING });
           current.setCoords();
@@ -73,10 +70,8 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, impor
       const obj = e.target;
       if (obj && obj.data?.id) {
         callbacks.current.onRecordHistory();
-        
         const bgWidth = fCanvas.backgroundImage?.width * fCanvas.backgroundImage?.scaleX || 1;
         const bgHeight = fCanvas.backgroundImage?.height * fCanvas.backgroundImage?.scaleY || 1;
-
         fCanvas.getObjects().forEach((canvasObj: any) => {
           if (canvasObj.data?.id) {
             const relX = (canvasObj.left / bgWidth) * 100;
@@ -138,26 +133,11 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, impor
       const displayContent = cleanText(obj.originalText, hideLabels);
       let fabricObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id);
       
-      // Calculate Width: Mode Full vs Mode Box
       const finalWidth = importMode === 'full' 
         ? containerSize.width - (obj.paddingLeft + obj.paddingRight + 40)
         : obj.width;
 
-      // Boundary Clamping Calculation
-      const minX = obj.paddingLeft + (finalWidth / 2);
-      const maxX = containerSize.width - obj.paddingRight - (finalWidth / 2);
-      const minY = obj.paddingTop + (obj.fontSize / 2);
-      const maxY = containerSize.height - obj.paddingBottom - (obj.fontSize / 2);
-
-      const rawPosX = (obj.x / 100) * containerSize.width;
-      const rawPosY = (obj.y / 100) * containerSize.height;
-
-      const posX = Math.max(minX, Math.min(maxX, rawPosX));
-      const posY = Math.max(minY, Math.min(maxY, rawPosY));
-
       const props = {
-        left: posX,
-        top: posY,
         width: finalWidth,
         fontSize: obj.fontSize,
         padding: 0, 
@@ -180,8 +160,28 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, impor
         fCanvas.add(fabricObj);
       } else {
         if (fabricObj !== fCanvas.getActiveObject() || !fabricObj.isEditing) fabricObj.set(props);
-        else fabricObj.set({ fontSize: props.fontSize, fill: props.fill, stroke: props.stroke, strokeWidth: props.strokeWidth, fontFamily: props.fontFamily, shadow: props.shadow });
       }
+
+      // PERBAIKAN: Kalkulasi Boundary Clamping dinamis berdasarkan tinggi asli fabricObj 
+      fabricObj.setCoords();
+      const objHeight = fabricObj.height * (fabricObj.scaleY || 1);
+      
+      // Hitung batas aman Y berdasarkan tinggi objek yang sudah ter-wrap
+      const minY = obj.paddingTop + (objHeight / 2);
+      const maxY = containerSize.height - obj.paddingBottom - (objHeight / 2);
+
+      const rawPosX = (obj.x / 100) * containerSize.width;
+      const rawPosY = (obj.y / 100) * containerSize.height;
+
+      // Clamp X tetap menggunakan finalWidth
+      const minX = obj.paddingLeft + (finalWidth / 2);
+      const maxX = containerSize.width - obj.paddingRight - (finalWidth / 2);
+
+      const posX = Math.max(minX, Math.min(maxX, rawPosX));
+      // Teks akan otomatis terdorong ke atas jika memanjang melebihi maxY
+      const posY = Math.max(minY, Math.min(maxY, rawPosY));
+
+      fabricObj.set({ left: posX, top: posY });
     });
 
     const target = fCanvas.getObjects().find((o: any) => o.data?.id === selectedTextId);

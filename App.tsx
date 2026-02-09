@@ -1,3 +1,4 @@
+// FULL REWRITE - Memperbaiki isolasi Local Style
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle, ImportMode } from './types';
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
@@ -172,19 +173,29 @@ const App: React.FC = () => {
     });
   }, []);
 
+  // Perbaikan Isolasi Local Style: Jika local active, tidak mengubah globalStyle
   const updateGlobalStyle = useCallback((newStyle: TextStyle) => {
     const { x, y } = getPosFromAlign(newStyle.alignment, newStyle.verticalAlignment);
     setState(prev => {
       const isLocalActive = prev.selectedPageId && prev.pages.find(p => p.id === prev.selectedPageId)?.isLocalStyle;
+      
       const newPages = prev.pages.map(page => {
         if (isLocalActive) {
+          // Hanya update halaman yang sedang dipilih jika Local Style aktif
           if (page.id !== prev.selectedPageId) return page;
           return { ...page, localStyle: newStyle, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
         }
+        // Jika Local Style halaman lain aktif, jangan timpa dengan global update
         if (page.isLocalStyle) return page;
+        // Update halaman global biasa
         return { ...page, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
       });
-      return { ...prev, globalStyle: isLocalActive ? prev.globalStyle : newStyle, pages: newPages };
+
+      return { 
+        ...prev, 
+        globalStyle: isLocalActive ? prev.globalStyle : newStyle, 
+        pages: newPages 
+      };
     });
   }, []);
 
@@ -215,8 +226,6 @@ const App: React.FC = () => {
 
         page.textObjects.forEach((obj) => {
           const displayContent = cleanText(obj.originalText, state.hideLabels);
-          
-          // Apply dynamic width for full-width support in export
           const finalWidth = state.importMode === 'full' 
             ? originalWidth - ((obj.paddingLeft + obj.paddingRight + 40) * scalingFactor)
             : obj.width * scalingFactor;
@@ -287,15 +296,11 @@ const App: React.FC = () => {
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-        onUpload={handleUpload}
       />
       <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
         {state.pages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-500 italic">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mb-4 opacity-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <p>Upload comic pages from sidebar to begin.</p>
+          <div className="h-full flex items-center justify-center">
+            <Uploader onUpload={handleUpload} />
           </div>
         ) : (
           <>

@@ -1,4 +1,4 @@
-
+// FULL REWRITE - Menjaga konsistensi tipe data
 export type Alignment = 'left' | 'center' | 'right';
 export type VerticalAlignment = 'top' | 'middle' | 'bottom';
 export type ImportMode = 'full' | 'box';
@@ -10,8 +10,8 @@ export interface TextStyle {
   paddingBottom: number;
   paddingLeft: number;
   color: string;
-  alignment: Alignment; // Horizontal Position
-  verticalAlignment: VerticalAlignment; // Vertical Position
+  alignment: Alignment; 
+  verticalAlignment: VerticalAlignment; 
   outlineColor: string;
   outlineWidth: number;
   glowColor: string;
