@@ -177,7 +177,17 @@ const App: React.FC = () => {
   const goToPrevPage = useCallback(() => {
     setState(prev => {
       const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
-      if (idx > 0) return { ...prev, selectedPageId: prev.pages[idx - 1].id, selectedTextId: null };
+      if (idx > 0) {
+        const targetId = prev.pages[idx - 1].id;
+        return { 
+          ...prev, 
+          selectedPageId: targetId, 
+          selectedTextId: null,
+          pages: prev.pages.map(p => (p.id === targetId && p.isLocalStyle === undefined) ? {
+            ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
+          } : p)
+        };
+      }
       return prev;
     });
   }, []);
@@ -328,7 +338,18 @@ const App: React.FC = () => {
         ) : (
           <>
             {state.isGalleryView ? (
-              <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(prev => ({ ...prev, selectedPageId: id, isGalleryView: false }))} />
+            <Gallery 
+                pages={state.pages} 
+                hideLabels={state.hideLabels} 
+                onSelectPage={(id) => setState(prev => ({ 
+                  ...prev, 
+                  selectedPageId: id, 
+                  isGalleryView: false,
+                  pages: prev.pages.map(p => (p.id === id && p.isLocalStyle === undefined) ? {
+                    ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
+                  } : p)
+                }))} 
+              />
             ) : (
               <div className="h-full flex flex-col items-center">
                 <div className="mb-4 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
