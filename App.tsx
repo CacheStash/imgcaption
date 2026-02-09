@@ -28,6 +28,24 @@ const App: React.FC = () => {
     state.pages.forEach(p => savePageToCache(p));
   }, [state.pages]);
 
+  // FIX: Mengembalikan logika handleUpload agar Drag n Drop jalan lagi
+  const handleUpload = useCallback((files: File[]) => {
+    const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const newPages: Page[] = sortedFiles.map((file) => {
+      const cached = loadPageFromCache(file.name, file.size);
+      return {
+        id: generateId(),
+        imageUrl: URL.createObjectURL(file),
+        fileName: file.name,
+        fileSize: file.size,
+        textObjects: cached?.textObjects || [],
+        bubbles: [],
+        overrideStyle: cached?.overrideStyle
+      };
+    });
+    setState(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
+  }, []);
+
   const updatePageText = useCallback((pageId: string, textId: string, updates: Partial<TextObject>) => {
     setState(prev => ({
       ...prev,
@@ -44,7 +62,13 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
       <Sidebar 
         state={state} setState={setState} 
-        onTextImport={(rawText) => {/* Logic Import */}}
+        onTextImport={(rawText) => {
+          const parsedData = parseRawText(rawText);
+          setState(prev => ({
+            ...prev,
+            pages: prev.pages.map((p, i) => parsedData[i+1] ? {...p, textObjects: parsedData[i+1].map(t => createDefaultTextObject(t, prev.globalStyle))} : p)
+          }));
+        }}
         onUpdateText={updatePageText}
         onAddText={(pId) => setState(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pId ? { ...p, textObjects: [...p.textObjects, createDefaultTextObject("New", prev.globalStyle)]} : p)}))}
         onClearAll={() => { localStorage.clear(); window.location.reload(); }}
@@ -54,12 +78,17 @@ const App: React.FC = () => {
 
       <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
         <div className="absolute top-4 right-4 z-50">
-          <button onClick={async () => {/* Export ZIP Logic */}} className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-xs font-bold shadow-lg transition-all">EXPORT ZIP</button>
+          <button onClick={async () => {
+             const zip = new JSZip();
+             zip.file("project.json", JSON.stringify(state.pages));
+             const content = await zip.generateAsync({type:"blob"});
+             saveAs(content, "export.zip");
+          }} className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-xs font-bold shadow-lg">EXPORT ZIP</button>
         </div>
         
         {state.pages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <Uploader onUpload={(files) => {/* Upload Logic */}} />
+            <Uploader onUpload={handleUpload} />
           </div>
         ) : (
           state.isGalleryView ? (
@@ -72,18 +101,15 @@ const App: React.FC = () => {
 
               {selectedPage && (
                 <Editor 
-  page={selectedPage} 
-  hideLabels={state.hideLabels}
-  globalStyle={state.globalStyle}
-  selectedTextId={state.selectedTextId}
-  // BUNGKUS DENGAN ARROW FUNCTION AGAR ARGUMEN COCOK
-  onUpdateText={(textId, updates) => updatePageText(selectedPage.id, textId, updates)}
-  onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
-  onUpdateOverride={(s) => setState(prev => ({
-    ...prev, 
-    pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)
-  }))}
-/>
+                  page={selectedPage} 
+                  hideLabels={state.hideLabels}
+                  globalStyle={state.globalStyle}
+                  selectedTextId={state.selectedTextId}
+                  // FIX: Menyesuaikan argumen fungsi agar tidak error
+                  onUpdateText={(textId, updates) => updatePageText(selectedPage.id, textId, updates)}
+                  onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
+                  onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
+                />
               )}
             </div>
           )
