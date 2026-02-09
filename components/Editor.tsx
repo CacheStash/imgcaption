@@ -24,10 +24,11 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   const applyAutoLayout = useCallback((fCanvas: any) => {
     const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
     if (texts.length === 0) return;
-    const padding = activeStyle.padding;
+    const padding = activeStyle.padding || 20;
     const gap = 15;
     let totalHeight = texts.reduce((acc: number, o: any) => acc + (o.height * o.scaleY) + gap, 0) - gap;
     let currentY = padding;
+
     if (activeStyle.verticalAlign === 'middle') currentY = (fCanvas.height / 2) - (totalHeight / 2);
     else if (activeStyle.verticalAlign === 'bottom') currentY = fCanvas.height - totalHeight - padding;
 
@@ -73,8 +74,9 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     if (!fabricCanvasRef.current) return;
     const fCanvas = fabricCanvasRef.current;
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
-      const maxWidth = containerRef.current?.clientWidth || 800;
-      const scale = maxWidth / img.width;
+      if (!img) return;
+      const containerWidth = containerRef.current?.clientWidth || 800;
+      const scale = containerWidth / img.width;
       fCanvas.setDimensions({ width: img.width * scale, height: img.height * scale });
       img.set({ scaleX: scale, scaleY: scale, selectable: false, evented: false });
       fCanvas.setBackgroundImage(img, () => {
@@ -100,7 +102,7 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
       <div className="flex gap-2 bg-slate-800 p-2 rounded-xl border border-slate-700 shadow-lg">
         <button 
           onClick={() => setIsMaskMode(!isMaskMode)} 
-          className={`px-4 h-8 rounded text-xs font-bold transition-all ${isMaskMode ? 'bg-blue-600' : 'bg-slate-900 text-blue-400 border border-blue-900/50'}`}
+          className={`px-4 h-8 rounded text-xs font-bold transition-all ${isMaskMode ? 'bg-blue-600' : 'bg-slate-900 text-blue-400 border border-blue-900/50 hover:bg-slate-800'}`}
         >
           {isMaskMode ? 'Click on Balloon...' : '+ SMART MASK'}
         </button>
@@ -108,31 +110,20 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
         <select 
           value={activeStyle.fontFamily} 
           onChange={(e) => onUpdateOverride({...activeStyle, fontFamily: e.target.value})} 
-          className="bg-slate-900 text-[10px] px-2 h-8 rounded outline-none border border-slate-700 text-slate-200"
+          className="bg-slate-900 text-[10px] px-2 h-8 rounded border border-slate-700 outline-none text-slate-200"
         >
           {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
         </select>
         <div className="w-px h-6 bg-slate-700 mx-1"></div>
-        <select 
-          value={activeStyle.alignment} 
-          onChange={(e) => onUpdateOverride({...activeStyle, alignment: e.target.value as Alignment})} 
-          className="bg-transparent text-[10px] px-2 outline-none text-slate-200"
-        >
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
+        <select value={activeStyle.alignment} onChange={(e) => onUpdateOverride({...activeStyle, alignment: e.target.value as Alignment})} className="bg-transparent text-[10px] px-2 outline-none">
+          <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
         </select>
-        <select 
-          value={activeStyle.verticalAlign} 
-          onChange={(e) => onUpdateOverride({...activeStyle, verticalAlign: e.target.value as VerticalAlignment})} 
-          className="bg-transparent text-[10px] px-2 outline-none text-slate-200"
-        >
-          <option value="top">Top</option>
-          <option value="middle">Middle</option>
-          <option value="bottom">Bottom</option>
+        <select value={activeStyle.verticalAlign} onChange={(e) => onUpdateOverride({...activeStyle, verticalAlign: e.target.value as VerticalAlignment})} className="bg-transparent text-[10px] px-2 outline-none">
+          <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
         </select>
       </div>
-      <div ref={containerRef} className="w-full flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden">
+      <div ref={containerRef} className="w-full flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[400px]">
+        {isMaskMode && <div className="absolute inset-0 bg-blue-500/5 cursor-crosshair z-10 border-2 border-blue-500/20 pointer-events-none"></div>}
         <canvas ref={canvasRef} />
       </div>
     </div>

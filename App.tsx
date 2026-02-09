@@ -28,7 +28,6 @@ const App: React.FC = () => {
     state.pages.forEach(p => savePageToCache(p));
   }, [state.pages]);
 
-  // FIX: Mengembalikan logika handleUpload agar Drag n Drop jalan lagi
   const handleUpload = useCallback((files: File[]) => {
     const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     const newPages: Page[] = sortedFiles.map((file) => {
@@ -62,15 +61,21 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
       <Sidebar 
         state={state} setState={setState} 
-        onTextImport={(rawText) => {
-          const parsedData = parseRawText(rawText);
+        onTextImport={(txt) => {
+          const parsedData = parseRawText(txt);
           setState(prev => ({
             ...prev,
-            pages: prev.pages.map((p, i) => parsedData[i+1] ? {...p, textObjects: parsedData[i+1].map(t => createDefaultTextObject(t, prev.globalStyle))} : p)
+            pages: prev.pages.map((p, i) => {
+              if (parsedData[i+1]) {
+                const newObjs = parsedData[i+1].map(t => createDefaultTextObject(t, prev.globalStyle));
+                return { ...p, textObjects: [...p.textObjects, ...newObjs] };
+              }
+              return p;
+            })
           }));
         }}
         onUpdateText={updatePageText}
-        onAddText={(pId) => setState(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pId ? { ...p, textObjects: [...p.textObjects, createDefaultTextObject("New", prev.globalStyle)]} : p)}))}
+        onAddText={(pId) => setState(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pId ? { ...p, textObjects: [...p.textObjects, createDefaultTextObject("New Box", prev.globalStyle)]} : p)}))}
         onClearAll={() => { localStorage.clear(); window.location.reload(); }}
         onUpdateGlobalStyle={(s) => setState(p => ({ ...p, globalStyle: s }))}
         onUpdatePageStyle={(s) => selectedPage && setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
@@ -80,9 +85,9 @@ const App: React.FC = () => {
         <div className="absolute top-4 right-4 z-50">
           <button onClick={async () => {
              const zip = new JSZip();
-             zip.file("project.json", JSON.stringify(state.pages));
+             zip.file("project_data.json", JSON.stringify(state.pages));
              const content = await zip.generateAsync({type:"blob"});
-             saveAs(content, "export.zip");
+             saveAs(content, "ZenReader_Export.zip");
           }} className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-xs font-bold shadow-lg">EXPORT ZIP</button>
         </div>
         
@@ -96,7 +101,8 @@ const App: React.FC = () => {
           ) : (
             <div className="h-full flex flex-col items-center">
               <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                <button onClick={() => setState(p => ({ ...p, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">← Back</button>
+                <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">← Back to Gallery</button>
+                <span className="text-xs font-mono text-slate-500">Page {selectedPageIndex + 1} / {state.pages.length}</span>
               </div>
 
               {selectedPage && (
@@ -105,7 +111,6 @@ const App: React.FC = () => {
                   hideLabels={state.hideLabels}
                   globalStyle={state.globalStyle}
                   selectedTextId={state.selectedTextId}
-                  // FIX: Menyesuaikan argumen fungsi agar tidak error
                   onUpdateText={(textId, updates) => updatePageText(selectedPage.id, textId, updates)}
                   onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
                   onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
