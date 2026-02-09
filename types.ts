@@ -6,23 +6,23 @@ export interface TextStyle {
   fontSize: number;
   color: string;
   alignment: Alignment;
-  verticalAlign: VerticalAlignment; // Untuk posisi vertikal global
+  verticalAlign: VerticalAlignment;
   outlineColor: string;
   outlineWidth: number;
   glowColor: string;
   glowBlur: number;
   glowOpacity: number;
   fontFamily: string;
-  padding: number;       // Safe area/margin dari pinggir gambar
-  boxType: BoxType;      // Tipe box: panjang (caption) atau kotak (dialogue)
+  padding: number;
+  boxType: BoxType;
 }
 
 export interface TextObject extends TextStyle {
   id: string;
   originalText: string;
-  x: number; // percentage 0-100
-  y: number; // percentage 0-100
-  width: number; // pixels
+  x: number; 
+  y: number; 
+  width: number; 
 }
 
 export type BubbleStyle = 'speech' | 'thought' | 'scream' | 'square';
@@ -40,18 +40,18 @@ export interface BubbleObject {
   borderWidth: number;
 }
 
-export interface SavedStyle {
-  id: string;
-  name: string;
-  style: TextStyle;
-}
-
 export interface Page {
   id: string;
   imageUrl: string;
   fileName: string;
   textObjects: TextObject[];
   bubbles: BubbleObject[];
+}
+
+export interface SavedStyle {
+  id: string;
+  name: string;
+  style: TextStyle;
 }
 
 export interface AppState {
