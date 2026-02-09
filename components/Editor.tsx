@@ -50,34 +50,30 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
       else if (activeStyle.alignment === 'right') currentX = fCanvas.width - obj.getScaledWidth() - padding;
       obj.set({ left: currentX, top: currentY });
       obj.setCoords();
-      currentY += obj.getScaledHeight() + gap;
+      currentY += (obj.getScaledHeight()) + gap;
     });
     fCanvas.renderAll();
   }, [activeStyle]);
 
+  // Inisialisasi Canvas Sekali Saja
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { backgroundColor: '#0f172a', preserveObjectStacking: true });
     fabricCanvasRef.current = fCanvas;
 
-    fCanvas.on('selection:created', (e: any) => onSelectText(e.selected[0]?.data?.id));
+    fCanvas.on('selection:created', (e: any) => onSelectText(e.selected[0]?.data?.id || null));
     fCanvas.on('selection:cleared', () => onSelectText(null));
-
     fCanvas.on('object:modified', (e: any) => {
       const obj = e.target;
       if (obj.data?.type === 'text') {
-        // Simpan koordinat relatif (%) agar sinkron saat export resolusi tinggi
-        onUpdateText(obj.data.id, { 
-          x: obj.left / fCanvas.width, 
-          y: obj.top / fCanvas.height, 
-          isManuallyPlaced: true 
-        });
+        onUpdateText(obj.data.id, { x: obj.left / fCanvas.width, y: obj.top / fCanvas.height, isManuallyPlaced: true });
       }
     });
 
     return () => fCanvas.dispose();
   }, [onSelectText, onUpdateText]);
 
+  // Render Image & Text (Dependencies diatur agar klik tidak memicu re-render background)
   useEffect(() => {
     if (!fabricCanvasRef.current || containerWidth === 0) return;
     const fCanvas = fabricCanvasRef.current;
@@ -110,7 +106,7 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
         applyAutoLayout(fCanvas);
       });
     }, { crossOrigin: 'anonymous' });
-    // Hapus selectedTextId dari dependency agar klik tidak memicu re-render image
+    // DILARANG memasukkan selectedTextId ke sini agar klik tidak bikin blank
   }, [page.imageUrl, page.textObjects, activeStyle, hideLabels, applyAutoLayout, containerWidth]);
 
   return (

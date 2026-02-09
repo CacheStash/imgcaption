@@ -65,41 +65,29 @@ const App: React.FC = () => {
     for (const page of state.pages) {
       await new Promise<void>((resolve) => {
         fabric.Image.fromURL(page.imageUrl, (img: any) => {
-          const originalW = img.width;
-          const originalH = img.height;
-          fCanvas.setDimensions({ width: originalW, height: originalH });
+          fCanvas.setDimensions({ width: img.width, height: img.height });
           fCanvas.setBackgroundImage(img, () => {
             const style = page.overrideStyle || state.globalStyle;
-            
-            // Hitung total height untuk auto-layout vertikal
-            const autoTexts = page.textObjects.filter(t => !t.isManuallyPlaced);
-            const scaleFactor = originalW / 800; 
-            const padding = style.padding * scaleFactor;
-            const gap = 15 * scaleFactor;
-            
-            // Render objek teks
-            page.textObjects.forEach((obj, idx) => {
-              const boxWidth = style.boxType === 'caption' ? originalW - (padding * 2) : 320 * scaleFactor;
-              const tBox = new fabric.Textbox(cleanText(obj.originalText, state.hideLabels), {
-                width: boxWidth, fontSize: style.fontSize * scaleFactor, fill: style.color,
-                textAlign: style.alignment, fontFamily: style.fontFamily,
-                stroke: style.outlineColor, strokeWidth: style.outlineWidth * scaleFactor,
-                strokeUniform: true, paintFirst: 'stroke',
-                shadow: new fabric.Shadow({ color: style.glowColor, blur: style.glowBlur * scaleFactor })
-              });
+            const scaleFactor = img.width / 800; 
 
-              if (obj.isManuallyPlaced) {
-                tBox.set({ left: obj.x * originalW, top: obj.y * originalH });
-              } else {
-                // Sederhanakan posisi vertikal untuk export (bisa dikembangkan lebih lanjut)
-                tBox.set({ left: padding, top: padding + (idx * (tBox.height + gap)) });
-              }
+            page.textObjects.forEach((obj, idx) => {
+              const tBox = new fabric.Textbox(cleanText(obj.originalText, state.hideLabels), {
+                width: style.boxType === 'caption' ? img.width - (style.padding * 2 * scaleFactor) : 320 * scaleFactor,
+                fontSize: style.fontSize * scaleFactor,
+                fill: style.color,
+                textAlign: style.alignment,
+                fontFamily: style.fontFamily,
+                stroke: style.outlineColor,
+                strokeWidth: style.outlineWidth * scaleFactor,
+                shadow: new fabric.Shadow({ color: style.glowColor, blur: style.glowBlur * scaleFactor }),
+                left: obj.isManuallyPlaced ? obj.x * img.width : style.padding * scaleFactor,
+                top: obj.isManuallyPlaced ? obj.y * img.height : (100 * scaleFactor) + (idx * 60 * scaleFactor)
+              });
               fCanvas.add(tBox);
             });
 
             fCanvas.renderAll();
-            const dataUrl = fCanvas.toDataURL({ format: 'jpeg', quality: 0.95 });
-            zip.file(`edited_${page.fileName}`, dataUrl.split(',')[1], { base64: true });
+            zip.file(`edited_${page.fileName}`, fCanvas.toDataURL({ format: 'jpeg', quality: 0.95 }).split(',')[1], { base64: true });
             fCanvas.clear();
             resolve();
           });
@@ -125,22 +113,24 @@ const App: React.FC = () => {
         onUpdateGlobalStyle={(s) => setState(p => ({ ...p, globalStyle: s }))}
         onUpdatePageStyle={(s) => selectedPage && setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
       />
+      {/* FIXED: Conditional flex centering untuk Uploader */}
       <main className={`flex-1 relative overflow-auto bg-slate-900 p-8 shadow-inner ${state.pages.length === 0 ? 'flex items-center justify-center' : ''}`}>
         {state.pages.length === 0 ? <Uploader onUpload={handleUpload} /> : (
           state.isGalleryView ? <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(p => ({ ...p, selectedPageId: id, isGalleryView: false }))} /> : (
-            <div className="h-full flex flex-col items-center">
-              <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+            <div className="h-full flex flex-col items-center relative">
+              <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700 z-10">
                 <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">← Back</button>
-                <span className="text-xs font-mono text-slate-500">Page {selectedPageIndex + 1} / {state.pages.length}</span>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => navigatePage('prev')} disabled={selectedPageIndex === 0} className="px-3 py-1 bg-slate-800 rounded border border-slate-700 text-xs disabled:opacity-30">PREV</button>
+                  <span className="text-xs font-mono text-slate-500">Page {selectedPageIndex + 1} / {state.pages.length}</span>
+                  <button onClick={() => navigatePage('next')} disabled={selectedPageIndex === state.pages.length - 1} className="px-3 py-1 bg-slate-800 rounded border border-slate-700 text-xs disabled:opacity-30">NEXT</button>
+                </div>
               </div>
               
-              <div className="flex-1 w-full flex items-center justify-center relative gap-8">
-                {/* FLOATING NAVIGATION */}
-                <button onClick={() => navigatePage('prev')} disabled={selectedPageIndex === 0} className="p-4 bg-slate-800 hover:bg-blue-600 disabled:opacity-20 rounded-full shadow-2xl z-30 transition-all border border-slate-700">PREV</button>
-                
+              <div className="flex-1 w-full flex items-center justify-center relative">
                 {selectedPage && (
                   <Editor 
-                    key={selectedPage.id}
+                    key={selectedPage.id} // Paksa reset canvas saat ganti halaman
                     page={selectedPage} 
                     hideLabels={state.hideLabels}
                     globalStyle={state.globalStyle}
@@ -150,8 +140,6 @@ const App: React.FC = () => {
                     onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
                   />
                 )}
-
-                <button onClick={() => navigatePage('next')} disabled={selectedPageIndex === state.pages.length - 1} className="p-4 bg-slate-800 hover:bg-blue-600 disabled:opacity-20 rounded-full shadow-2xl z-30 transition-all border border-slate-700">NEXT</button>
               </div>
             </div>
           )
