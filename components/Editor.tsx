@@ -115,10 +115,10 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
           {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
         </select>
         <div className="w-px h-6 bg-slate-700 mx-1"></div>
-        <select value={activeStyle.alignment} onChange={(e) => onUpdateOverride({...activeStyle, alignment: e.target.value as Alignment})} className="bg-transparent text-[10px] px-2 outline-none">
+        <select value={activeStyle.alignment} onChange={(e) => onUpdateOverride({...activeStyle, alignment: e.target.value as Alignment})} className="bg-transparent text-[10px] px-2 outline-none text-slate-200">
           <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
         </select>
-        <select value={activeStyle.verticalAlign} onChange={(e) => onUpdateOverride({...activeStyle, verticalAlign: e.target.value as VerticalAlignment})} className="bg-transparent text-[10px] px-2 outline-none">
+        <select value={activeStyle.verticalAlign} onChange={(e) => onUpdateOverride({...activeStyle, verticalAlign: e.target.value as VerticalAlignment})} className="bg-transparent text-[10px] px-2 outline-none text-slate-200">
           <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
         </select>
       </div>

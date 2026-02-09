@@ -24,9 +24,15 @@ const App: React.FC = () => {
     return initial;
   });
 
+  // Sinkronisasi data ke LocalStorage dan Cache
   useEffect(() => {
+    localStorage.setItem('comic-editor-state-v5', JSON.stringify({
+      globalStyle: state.globalStyle,
+      savedStyles: state.savedStyles,
+      hideLabels: state.hideLabels,
+    }));
     state.pages.forEach(p => savePageToCache(p));
-  }, [state.pages]);
+  }, [state.globalStyle, state.savedStyles, state.hideLabels, state.pages]);
 
   const handleUpload = useCallback((files: File[]) => {
     const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -65,13 +71,7 @@ const App: React.FC = () => {
           const parsedData = parseRawText(txt);
           setState(prev => ({
             ...prev,
-            pages: prev.pages.map((p, i) => {
-              if (parsedData[i+1]) {
-                const newObjs = parsedData[i+1].map(t => createDefaultTextObject(t, prev.globalStyle));
-                return { ...p, textObjects: [...p.textObjects, ...newObjs] };
-              }
-              return p;
-            })
+            pages: prev.pages.map((p, i) => parsedData[i+1] ? {...p, textObjects: parsedData[i+1].map(t => createDefaultTextObject(t, prev.globalStyle))} : p)
           }));
         }}
         onUpdateText={updatePageText}
@@ -81,7 +81,7 @@ const App: React.FC = () => {
         onUpdatePageStyle={(s) => selectedPage && setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
       />
 
-      <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
+      <main className="flex-1 relative overflow-auto bg-slate-900 p-8 shadow-inner">
         <div className="absolute top-4 right-4 z-50">
           <button onClick={async () => {
              const zip = new JSZip();
@@ -101,7 +101,7 @@ const App: React.FC = () => {
           ) : (
             <div className="h-full flex flex-col items-center">
               <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">← Back to Gallery</button>
+                <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">← Back to Gallery</button>
                 <span className="text-xs font-mono text-slate-500">Page {selectedPageIndex + 1} / {state.pages.length}</span>
               </div>
 
@@ -123,4 +123,5 @@ const App: React.FC = () => {
     </div>
   );
 };
+
 export default App;
