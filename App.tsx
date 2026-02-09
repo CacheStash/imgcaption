@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle } from './types';
-import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE } from './utils/helpers';
+import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, loadPageFromCache, savePageToCache } from './utils/helpers';
 import Sidebar from './components/Sidebar';
 import Gallery from './components/Gallery';
 import Editor from './components/Editor';
 import Uploader from './components/Uploader';
+import JSZip from 'jszip'; // Error Resolved after npm install
+import { saveAs } from 'file-saver'; // Error Resolved after npm install
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
@@ -22,29 +24,28 @@ const App: React.FC = () => {
     return initial;
   });
 
-  // Sinkronisasi LocalStorage
+  // Sinkronisasi Cache Halaman (Restore Progress)
   useEffect(() => {
-    localStorage.setItem('comic-editor-state-v5', JSON.stringify({
-      globalStyle: state.globalStyle,
-      savedStyles: state.savedStyles,
-      hideLabels: state.hideLabels,
-    }));
-  }, [state.globalStyle, state.savedStyles, state.hideLabels]);
+    state.pages.forEach(p => savePageToCache(p));
+  }, [state.pages]);
 
-  // FIX: Logika Upload File & Drag n Drop
   const handleUpload = useCallback((files: File[]) => {
     const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    const newPages: Page[] = sortedFiles.map((file) => ({
-      id: generateId(),
-      imageUrl: URL.createObjectURL(file),
-      fileName: file.name,
-      textObjects: [],
-      bubbles: []
-    }));
+    const newPages: Page[] = sortedFiles.map((file) => {
+      const cached = loadPageFromCache(file.name, file.size);
+      return {
+        id: generateId(),
+        imageUrl: URL.createObjectURL(file),
+        fileName: file.name,
+        fileSize: file.size, // Identitas unik untuk cache
+        textObjects: cached?.textObjects || [],
+        bubbles: [],
+        overrideStyle: cached?.overrideStyle
+      };
+    });
     setState(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
   }, []);
 
-  // FIX: Logika Import Teks Otomatis
   const handleTextImport = useCallback((rawText: string) => {
     const parsedData = parseRawText(rawText);
     setState(prev => ({
@@ -60,26 +61,20 @@ const App: React.FC = () => {
     }));
   }, []);
 
-  const updatePageText = useCallback((pageId: string, textId: string, updates: Partial<TextObject>) => {
-    setState(prev => ({
-      ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { 
-        ...p, textObjects: p.textObjects.map(t => t.id === textId ? { ...t, ...updates } : t) 
-      } : p)
+  const exportZip = async () => {
+    const zip = new JSZip();
+    const exportData = state.pages.map(p => ({
+      fileName: p.fileName,
+      dialogues: p.textObjects.map(t => t.originalText)
     }));
-  }, []);
-
-  const updatePageStyle = useCallback((pageId: string, style: TextStyle | undefined) => {
-    setState(prev => ({
-      ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { ...p, overrideStyle: style } : p)
-    }));
-  }, []);
+    zip.file("project_data.json", JSON.stringify(exportData, null, 2));
+    const content = await zip.generateAsync({ type: "blob" });
+    saveAs(content, "ZenReader_Export.zip");
+  };
 
   const selectedPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
   const selectedPage = state.pages[selectedPageIndex] || null;
 
-  // FIX: Logika Navigasi Halaman
   const navigatePage = (direction: 'next' | 'prev') => {
     const newIndex = direction === 'next' ? selectedPageIndex + 1 : selectedPageIndex - 1;
     if (newIndex >= 0 && newIndex < state.pages.length) {
@@ -92,28 +87,27 @@ const App: React.FC = () => {
       <Sidebar 
         state={state} setState={setState} 
         onTextImport={handleTextImport}
-        onUpdateText={updatePageText}
+        onUpdateText={(pId, tId, updates) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === pId ? {...p, textObjects: p.textObjects.map(t => t.id === tId ? {...t, ...updates} : t)} : p)}))}
         onAddText={(pId) => setState(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pId ? { ...p, textObjects: [...p.textObjects, createDefaultTextObject("New", prev.globalStyle)]} : p)}))}
         onClearAll={() => { localStorage.clear(); window.location.reload(); }}
         onUpdateGlobalStyle={(s) => setState(p => ({ ...p, globalStyle: s }))}
-        onUpdatePageStyle={(s) => selectedPage && updatePageStyle(selectedPage.id, s)}
+        onUpdatePageStyle={(s) => selectedPage && setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
       />
 
-      <main className="flex-1 overflow-auto bg-slate-900 p-8">
+      <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
+        <div className="absolute top-4 right-4 z-50">
+          <button onClick={exportZip} className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-xs font-bold shadow-lg transition-all">EXPORT ZIP</button>
+        </div>
+        
         {state.pages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <Uploader onUpload={handleUpload} />
           </div>
         ) : (
           state.isGalleryView ? (
-            <Gallery 
-              pages={state.pages} 
-              hideLabels={state.hideLabels} 
-              onSelectPage={(id) => setState(p => ({ ...p, selectedPageId: id, isGalleryView: false }))} 
-            />
+            <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(p => ({ ...p, selectedPageId: id, isGalleryView: false }))} />
           ) : (
             <div className="h-full flex flex-col items-center">
-              {/* Toolbar Navigasi & Action */}
               <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
                 <div className="flex gap-2">
                   <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors">← Back</button>
@@ -123,7 +117,6 @@ const App: React.FC = () => {
                     <button onClick={() => navigatePage('next')} disabled={selectedPageIndex === state.pages.length - 1} className="p-2 hover:bg-slate-800 disabled:opacity-30 rounded px-3">NEXT</button>
                   </div>
                 </div>
-                
                 <div className="flex gap-2">
                   <button className="px-3 py-1 bg-slate-900 hover:bg-slate-700 rounded border border-slate-700 text-[10px]">UNDO</button>
                   <button className="px-3 py-1 bg-slate-900 hover:bg-slate-700 rounded border border-slate-700 text-[10px]">REDO</button>
@@ -136,9 +129,10 @@ const App: React.FC = () => {
                   page={selectedPage} 
                   hideLabels={state.hideLabels}
                   globalStyle={state.globalStyle}
-                  selectedTextId={state.selectedTextId} // FIX: Prop sekarang dikirim
-                  onUpdateText={(textId, updates) => updatePageText(selectedPage.id, textId, updates)}
+                  selectedTextId={state.selectedTextId}
+                  onUpdateText={(textId, updates) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, textObjects: p.textObjects.map(t => t.id === textId ? {...t, ...updates} : t)} : p)}))}
                   onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
+                  onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
                 />
               )}
             </div>

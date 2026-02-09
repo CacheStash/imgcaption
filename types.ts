@@ -42,15 +42,10 @@ export interface Page {
   id: string;
   imageUrl: string;
   fileName: string;
+  fileSize: number; // Tambahan untuk identifikasi cache
   textObjects: TextObject[];
   bubbles: BubbleObject[];
-  overrideStyle?: TextStyle; // Fitur Baru: Override per halaman
-}
-
-export interface SavedStyle {
-  id: string;
-  name: string;
-  style: TextStyle;
+  overrideStyle?: TextStyle;
 }
 
 export interface AppState {
@@ -61,5 +56,5 @@ export interface AppState {
   selectedBubbleId: string | null;
   isGalleryView: boolean;
   globalStyle: TextStyle;
-  savedStyles: SavedStyle[];
+  savedStyles: { id: string; name: string; style: TextStyle }[];
 }

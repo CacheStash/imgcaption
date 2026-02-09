@@ -1,4 +1,4 @@
-import { TextObject, TextStyle, BubbleObject } from '../types'; // FIXED PATH
+import { TextObject, TextStyle, BubbleObject, Page } from '../types'; // FIXED: Kembali ke ../types
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -17,6 +17,21 @@ export const DEFAULT_STYLE: TextStyle = {
   boxType: 'caption'
 };
 
+// --- FITUR: Cache Logic (Restore Progress) ---
+export const getFileCacheKey = (fileName: string, fileSize: number) => `zen-cache-${fileName}-${fileSize}`;
+
+export const savePageToCache = (page: Page) => {
+  const key = getFileCacheKey(page.fileName, (page as any).fileSize || 0);
+  const data = { textObjects: page.textObjects, overrideStyle: page.overrideStyle };
+  localStorage.setItem(key, JSON.stringify(data));
+};
+
+export const loadPageFromCache = (fileName: string, fileSize: number): any | null => {
+  const key = getFileCacheKey(fileName, fileSize);
+  const saved = localStorage.getItem(key);
+  return saved ? JSON.parse(saved) : null;
+};
+
 export const cleanText = (text: string, hideLabels: boolean): string => {
   if (!hideLabels) return text.trim();
   return text
@@ -25,23 +40,15 @@ export const cleanText = (text: string, hideLabels: boolean): string => {
     .trim();
 };
 
-// FITUR BARU: Logika pemecah teks berdasarkan Nama Karakter
 export const parseRawText = (text: string): Record<number, string[]> => {
   const result: Record<number, string[]> = {};
   const pageRegex = /Page\s+(\d+)\s*-\s*/gi;
   const sections = text.split(pageRegex);
-  
   for (let i = 1; i < sections.length; i += 2) {
     const pageNum = parseInt(sections[i], 10);
     const content = (sections[i + 1] || '').trim();
     if (!content || content.toLowerCase().includes('[gak ada dialog]')) continue;
-
-    // Memecah dialog jika ada pola ", Nama:"
-    const dialogues = content
-      .split(/,\s*(?=[^:]+:)/g)
-      .map(d => d.trim())
-      .filter(d => d.length > 0);
-    
+    const dialogues = content.split(/,\s*(?=[^:]+:)/g).map(d => d.trim()).filter(d => d.length > 0);
     if (dialogues.length > 0) result[pageNum] = dialogues;
   }
   return result;
