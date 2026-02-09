@@ -11,7 +11,7 @@ interface SidebarProps {
   onClearAll: () => void;
   onUpdateGlobalStyle: (style: TextStyle) => void;
   onUpdatePageStyle: (style: TextStyle | undefined) => void;
-  onExport: () => void; // PROPS BARU
+  onExport: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -34,18 +34,16 @@ const Sidebar: React.FC<SidebarProps> = ({
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">ZenReader Pro</h1>
           <button onClick={onClearAll} className="p-2 text-slate-600 hover:text-red-500 transition-colors text-xs font-bold">RESET</button>
         </div>
-        
-        {/* TOMBOL EXPORT DI SINI (SESUAI PERMINTAAN) */}
+
         <button 
           onClick={onExport}
           disabled={state.pages.length === 0}
-          className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:bg-slate-800 disabled:text-slate-600 rounded-xl text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2"
+          className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 rounded-xl text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2"
         >
-          <span>📦</span> EXPORT ZIP (IMAGES)
+          <span>🖼️</span> EXPORT ZIP (IMAGES)
         </button>
       </div>
 
-      {/* TYPOGRAPHY SECTION */}
       <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-4">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Typography</h3>
         <select value={currentStyle.fontFamily} onChange={(e) => handleStyleChange({ fontFamily: e.target.value })} className="w-full h-8 bg-slate-950 border border-slate-700 rounded text-xs px-2 outline-none text-white">
@@ -57,7 +55,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </section>
 
-      {/* OUTLINE & GLOW SECTION */}
       <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-3">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Outline & Glow</h3>
         <div className="flex items-center gap-3">
@@ -70,7 +67,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </section>
 
-      {/* LAYOUT & SAFE AREA */}
       <section className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 space-y-4">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Layout & Padding</h3>
         <div className="grid grid-cols-2 gap-2">

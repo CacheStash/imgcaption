@@ -22,7 +22,6 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
 
   const activeStyle = page.overrideStyle || globalStyle;
 
-  // FIX BLANK: ResizeObserver untuk menjamin lebar kontainer
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver(entries => {
@@ -35,16 +34,18 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
 
   const applyAutoLayout = useCallback((fCanvas: any) => {
     const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
-    if (texts.length === 0) return;
+    const autoTexts = texts.filter((o: any) => !o.data?.isManuallyPlaced);
+    if (autoTexts.length === 0) return;
+
     const padding = activeStyle.padding || 20;
     const gap = 15;
-    let totalHeight = texts.reduce((acc: number, o: any) => acc + (o.getScaledHeight()) + gap, 0) - gap;
+    let totalHeight = autoTexts.reduce((acc: number, o: any) => acc + (o.getScaledHeight()) + gap, 0) - gap;
     let currentY = padding;
 
     if (activeStyle.verticalAlign === 'middle') currentY = (fCanvas.height / 2) - (totalHeight / 2);
     else if (activeStyle.verticalAlign === 'bottom') currentY = fCanvas.height - totalHeight - padding;
 
-    texts.forEach((obj: any) => {
+    autoTexts.forEach((obj: any) => {
       let currentX = padding;
       if (activeStyle.alignment === 'center') currentX = (fCanvas.width / 2) - (obj.getScaledWidth() / 2);
       else if (activeStyle.alignment === 'right') currentX = fCanvas.width - obj.getScaledWidth() - padding;
@@ -59,10 +60,20 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { backgroundColor: '#0f172a', preserveObjectStacking: true });
     fabricCanvasRef.current = fCanvas;
+
     fCanvas.on('selection:created', (e: any) => onSelectText(e.selected[0]?.data?.id));
     fCanvas.on('selection:cleared', () => onSelectText(null));
+
+    // SIMPAN POSISI SETELAH DRAG
+    fCanvas.on('object:modified', (e: any) => {
+      const obj = e.target;
+      if (obj.data?.type === 'text') {
+        onUpdateText(obj.data.id, { x: obj.left, y: obj.top, isManuallyPlaced: true });
+      }
+    });
+
     return () => fCanvas.dispose();
-  }, [onSelectText]);
+  }, [onSelectText, onUpdateText]);
 
   useEffect(() => {
     if (!fabricCanvasRef.current || containerWidth === 0) return;
@@ -78,11 +89,15 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
         page.textObjects.forEach((obj) => {
           const boxWidth = activeStyle.boxType === 'caption' ? fCanvas.width - (activeStyle.padding * 2) : 280;
           const tBox = new fabric.Textbox(cleanText(obj.originalText, hideLabels), {
+            left: obj.isManuallyPlaced ? obj.x : 0,
+            top: obj.isManuallyPlaced ? obj.y : 0,
             width: boxWidth, fontSize: activeStyle.fontSize, fill: activeStyle.color,
             textAlign: activeStyle.alignment, fontFamily: activeStyle.fontFamily,
             stroke: activeStyle.outlineColor, strokeWidth: activeStyle.outlineWidth,
             strokeUniform: true, paintFirst: 'stroke',
-            data: { id: obj.id, type: 'text' }, shadow: new fabric.Shadow({ color: activeStyle.glowColor, blur: activeStyle.glowBlur })
+            backgroundColor: activeStyle.textBackgroundColor !== 'transparent' ? activeStyle.textBackgroundColor : null,
+            data: { id: obj.id, type: 'text', isManuallyPlaced: obj.isManuallyPlaced }, 
+            shadow: new fabric.Shadow({ color: activeStyle.glowColor, blur: activeStyle.glowBlur })
           });
           fCanvas.add(tBox);
         });

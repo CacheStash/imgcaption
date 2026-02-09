@@ -63,5 +63,6 @@ export const createDefaultTextObject = (content: string, style: TextStyle): Text
   x: 50,
   y: 50,
   width: style.boxType === 'caption' ? 500 : 280,
+  isManuallyPlaced: false, // INIT FALSE
   ...style
 });

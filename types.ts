@@ -15,7 +15,7 @@ export interface TextStyle {
   fontFamily: string;
   padding: number;
   boxType: BoxType;
-  textBackgroundColor: string; // FITUR PENIMPA BALON
+  textBackgroundColor: string;
 }
 
 export interface TextObject extends TextStyle {
@@ -23,7 +23,8 @@ export interface TextObject extends TextStyle {
   originalText: string;
   x: number; 
   y: number; 
-  width: number; 
+  width: number;
+  isManuallyPlaced?: boolean; // UNTUK LOCK POSISI DRAG
 }
 
 export interface BubbleObject {
