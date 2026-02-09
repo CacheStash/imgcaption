@@ -33,25 +33,24 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   }, []);
 
   const applyAutoLayout = useCallback((fCanvas: any) => {
-    const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
-    const autoTexts = texts.filter((o: any) => !o.data?.isManuallyPlaced);
-    if (autoTexts.length === 0) return;
+    const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text' && !o.data?.isManuallyPlaced);
+    if (texts.length === 0) return;
 
     const padding = activeStyle.padding || 20;
     const gap = 15;
-    let totalHeight = autoTexts.reduce((acc: number, o: any) => acc + (o.getScaledHeight()) + gap, 0) - gap;
+    let totalHeight = texts.reduce((acc: number, o: any) => acc + o.getScaledHeight() + gap, 0) - gap;
     let currentY = padding;
 
     if (activeStyle.verticalAlign === 'middle') currentY = (fCanvas.height / 2) - (totalHeight / 2);
     else if (activeStyle.verticalAlign === 'bottom') currentY = fCanvas.height - totalHeight - padding;
 
-    autoTexts.forEach((obj: any) => {
+    texts.forEach((obj: any) => {
       let currentX = padding;
       if (activeStyle.alignment === 'center') currentX = (fCanvas.width / 2) - (obj.getScaledWidth() / 2);
       else if (activeStyle.alignment === 'right') currentX = fCanvas.width - obj.getScaledWidth() - padding;
       obj.set({ left: currentX, top: currentY });
       obj.setCoords();
-      currentY += (obj.getScaledHeight()) + gap;
+      currentY += obj.getScaledHeight() + gap;
     });
     fCanvas.renderAll();
   }, [activeStyle]);
@@ -64,11 +63,15 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     fCanvas.on('selection:created', (e: any) => onSelectText(e.selected[0]?.data?.id));
     fCanvas.on('selection:cleared', () => onSelectText(null));
 
-    // SIMPAN POSISI SETELAH DRAG
     fCanvas.on('object:modified', (e: any) => {
       const obj = e.target;
       if (obj.data?.type === 'text') {
-        onUpdateText(obj.data.id, { x: obj.left, y: obj.top, isManuallyPlaced: true });
+        // Simpan koordinat relatif (%) agar sinkron saat export resolusi tinggi
+        onUpdateText(obj.data.id, { 
+          x: obj.left / fCanvas.width, 
+          y: obj.top / fCanvas.height, 
+          isManuallyPlaced: true 
+        });
       }
     });
 
@@ -78,19 +81,22 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   useEffect(() => {
     if (!fabricCanvasRef.current || containerWidth === 0) return;
     const fCanvas = fabricCanvasRef.current;
+    
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
       if (!img) return;
       const scale = containerWidth / img.width;
       fCanvas.setDimensions({ width: img.width * scale, height: img.height * scale });
       img.set({ scaleX: scale, scaleY: scale, selectable: false, evented: false });
+      
       fCanvas.setBackgroundImage(img, () => {
         const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
         texts.forEach((o: any) => fCanvas.remove(o));
+        
         page.textObjects.forEach((obj) => {
           const boxWidth = activeStyle.boxType === 'caption' ? fCanvas.width - (activeStyle.padding * 2) : 280;
           const tBox = new fabric.Textbox(cleanText(obj.originalText, hideLabels), {
-            left: obj.isManuallyPlaced ? obj.x : 0,
-            top: obj.isManuallyPlaced ? obj.y : 0,
+            left: obj.isManuallyPlaced ? obj.x * fCanvas.width : 0,
+            top: obj.isManuallyPlaced ? obj.y * fCanvas.height : 0,
             width: boxWidth, fontSize: activeStyle.fontSize, fill: activeStyle.color,
             textAlign: activeStyle.alignment, fontFamily: activeStyle.fontFamily,
             stroke: activeStyle.outlineColor, strokeWidth: activeStyle.outlineWidth,
@@ -104,13 +110,12 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
         applyAutoLayout(fCanvas);
       });
     }, { crossOrigin: 'anonymous' });
+    // Hapus selectedTextId dari dependency agar klik tidak memicu re-render image
   }, [page.imageUrl, page.textObjects, activeStyle, hideLabels, applyAutoLayout, containerWidth]);
 
   return (
-    <div className="w-full flex flex-col items-center gap-4">
-      <div ref={containerRef} className="w-full max-w-4xl flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[500px]">
-        <canvas ref={canvasRef} />
-      </div>
+    <div ref={containerRef} className="w-full max-w-4xl flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[500px]">
+      <canvas ref={canvasRef} />
     </div>
   );
 };

@@ -37,6 +37,25 @@ const App: React.FC = () => {
     state.pages.forEach(p => savePageToCache(p));
   }, [state.pages]);
 
+  const handleUpload = useCallback((files: File[]) => {
+    const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const newPages: Page[] = sortedFiles.map((file) => {
+      const cached = loadPageFromCache(file.name, file.size);
+      return { id: generateId(), imageUrl: URL.createObjectURL(file), fileName: file.name, fileSize: file.size, textObjects: cached?.textObjects || [], bubbles: [], overrideStyle: cached?.overrideStyle };
+    });
+    setState(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
+  }, []);
+
+  const selectedPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
+  const selectedPage = state.pages[selectedPageIndex] || null;
+
+  const navigatePage = (direction: 'next' | 'prev') => {
+    const newIndex = direction === 'next' ? selectedPageIndex + 1 : selectedPageIndex - 1;
+    if (newIndex >= 0 && newIndex < state.pages.length) {
+      setState(prev => ({ ...prev, selectedPageId: state.pages[newIndex].id, selectedTextId: null }));
+    }
+  };
+
   const handleExportImages = async () => {
     if (state.pages.length === 0) return;
     const zip = new JSZip();
@@ -51,21 +70,33 @@ const App: React.FC = () => {
           fCanvas.setDimensions({ width: originalW, height: originalH });
           fCanvas.setBackgroundImage(img, () => {
             const style = page.overrideStyle || state.globalStyle;
-            page.textObjects.forEach((obj) => {
-              // KALIBRASI SKALA KOORDINAT
-              const scaleFactor = originalW / 800; // Asumsi preview width editor 800px
-              const boxWidth = style.boxType === 'caption' ? originalW - (style.padding * 2) : 320 * scaleFactor;
-              
+            
+            // Hitung total height untuk auto-layout vertikal
+            const autoTexts = page.textObjects.filter(t => !t.isManuallyPlaced);
+            const scaleFactor = originalW / 800; 
+            const padding = style.padding * scaleFactor;
+            const gap = 15 * scaleFactor;
+            
+            // Render objek teks
+            page.textObjects.forEach((obj, idx) => {
+              const boxWidth = style.boxType === 'caption' ? originalW - (padding * 2) : 320 * scaleFactor;
               const tBox = new fabric.Textbox(cleanText(obj.originalText, state.hideLabels), {
                 width: boxWidth, fontSize: style.fontSize * scaleFactor, fill: style.color,
                 textAlign: style.alignment, fontFamily: style.fontFamily,
                 stroke: style.outlineColor, strokeWidth: style.outlineWidth * scaleFactor,
                 strokeUniform: true, paintFirst: 'stroke',
-                left: obj.isManuallyPlaced ? (obj.x * (originalW / (800))) : style.padding, 
-                top: obj.isManuallyPlaced ? (obj.y * (originalH / (800 * (img.height/img.width)))) : 100
+                shadow: new fabric.Shadow({ color: style.glowColor, blur: style.glowBlur * scaleFactor })
               });
+
+              if (obj.isManuallyPlaced) {
+                tBox.set({ left: obj.x * originalW, top: obj.y * originalH });
+              } else {
+                // Sederhanakan posisi vertikal untuk export (bisa dikembangkan lebih lanjut)
+                tBox.set({ left: padding, top: padding + (idx * (tBox.height + gap)) });
+              }
               fCanvas.add(tBox);
             });
+
             fCanvas.renderAll();
             const dataUrl = fCanvas.toDataURL({ format: 'jpeg', quality: 0.95 });
             zip.file(`edited_${page.fileName}`, dataUrl.split(',')[1], { base64: true });
@@ -76,19 +107,8 @@ const App: React.FC = () => {
       });
     }
     const content = await zip.generateAsync({ type: "blob" });
-    saveAs(content, `ZenReader_Images_${new Date().getTime()}.zip`);
+    saveAs(content, `ZenReader_Export_${new Date().getTime()}.zip`);
   };
-
-  const handleUpload = useCallback((files: File[]) => {
-    const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    const newPages: Page[] = sortedFiles.map((file) => {
-      const cached = loadPageFromCache(file.name, file.size);
-      return { id: generateId(), imageUrl: URL.createObjectURL(file), fileName: file.name, fileSize: file.size, textObjects: cached?.textObjects || [], bubbles: [], overrideStyle: cached?.overrideStyle };
-    });
-    setState(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
-  }, []);
-
-  const selectedPage = state.pages.find(p => p.id === state.selectedPageId) || null;
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-inter">
@@ -96,8 +116,8 @@ const App: React.FC = () => {
         state={state} setState={setState} 
         onExport={handleExportImages}
         onTextImport={(txt) => {
-          const parsedData = parseRawText(txt);
-          setState(prev => ({ ...prev, pages: prev.pages.map((p, i) => parsedData[i+1] ? {...p, textObjects: parsedData[i+1].map(t => createDefaultTextObject(t, prev.globalStyle))} : p) }));
+          const data = parseRawText(txt);
+          setState(prev => ({ ...prev, pages: prev.pages.map((p, i) => data[i+1] ? {...p, textObjects: data[i+1].map(t => createDefaultTextObject(t, prev.globalStyle))} : p) }));
         }}
         onUpdateText={(pId, tId, updates) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === pId ? {...p, textObjects: p.textObjects.map(t => t.id === tId ? {...t, ...updates} : t)} : p)}))}
         onAddText={(pId) => setState(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pId ? { ...p, textObjects: [...p.textObjects, createDefaultTextObject("New Box", prev.globalStyle)]} : p)}))}
@@ -105,25 +125,34 @@ const App: React.FC = () => {
         onUpdateGlobalStyle={(s) => setState(p => ({ ...p, globalStyle: s }))}
         onUpdatePageStyle={(s) => selectedPage && setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
       />
-      <main className="flex-1 relative overflow-auto bg-slate-900 p-8 shadow-inner">
+      <main className={`flex-1 relative overflow-auto bg-slate-900 p-8 shadow-inner ${state.pages.length === 0 ? 'flex items-center justify-center' : ''}`}>
         {state.pages.length === 0 ? <Uploader onUpload={handleUpload} /> : (
           state.isGalleryView ? <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(p => ({ ...p, selectedPageId: id, isGalleryView: false }))} /> : (
             <div className="h-full flex flex-col items-center">
               <div className="w-full flex justify-between items-center mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
                 <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true }))} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">← Back</button>
+                <span className="text-xs font-mono text-slate-500">Page {selectedPageIndex + 1} / {state.pages.length}</span>
               </div>
-              {selectedPage && (
-                <Editor 
-                  key={selectedPage.id}
-                  page={selectedPage} 
-                  hideLabels={state.hideLabels}
-                  globalStyle={state.globalStyle}
-                  selectedTextId={state.selectedTextId}
-                  onUpdateText={(tId, updates) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, textObjects: p.textObjects.map(t => t.id === tId ? {...t, ...updates} : t)} : p)}))}
-                  onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
-                  onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
-                />
-              )}
+              
+              <div className="flex-1 w-full flex items-center justify-center relative gap-8">
+                {/* FLOATING NAVIGATION */}
+                <button onClick={() => navigatePage('prev')} disabled={selectedPageIndex === 0} className="p-4 bg-slate-800 hover:bg-blue-600 disabled:opacity-20 rounded-full shadow-2xl z-30 transition-all border border-slate-700">PREV</button>
+                
+                {selectedPage && (
+                  <Editor 
+                    key={selectedPage.id}
+                    page={selectedPage} 
+                    hideLabels={state.hideLabels}
+                    globalStyle={state.globalStyle}
+                    selectedTextId={state.selectedTextId}
+                    onUpdateText={(tId, updates) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, textObjects: p.textObjects.map(t => t.id === tId ? {...t, ...updates} : t)} : p)}))}
+                    onSelectText={(id) => setState(prev => ({ ...prev, selectedTextId: id }))}
+                    onUpdateOverride={(s) => setState(prev => ({...prev, pages: prev.pages.map(p => p.id === selectedPage.id ? {...p, overrideStyle: s} : p)}))}
+                  />
+                )}
+
+                <button onClick={() => navigatePage('next')} disabled={selectedPageIndex === state.pages.length - 1} className="p-4 bg-slate-800 hover:bg-blue-600 disabled:opacity-20 rounded-full shadow-2xl z-30 transition-all border border-slate-700">NEXT</button>
+              </div>
             </div>
           )
         )}
