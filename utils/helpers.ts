@@ -1,6 +1,14 @@
-import { TextObject, TextStyle, Page } from '../types'; //
+import { TextObject, TextStyle, Page } from '../types';
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);
+
+export const FONT_OPTIONS = [
+  { name: 'Formal', value: 'Inter' },
+  { name: 'Casual', value: 'sans-serif' },
+  { name: 'Fun (Comic)', value: "'Comic Neue', cursive" },
+  { name: 'Horror / Action', value: 'Bangers' },
+  { name: 'Script', value: "'Indie Flower', cursive" }
+];
 
 export const DEFAULT_STYLE: TextStyle = {
   fontSize: 24,
@@ -15,23 +23,18 @@ export const DEFAULT_STYLE: TextStyle = {
   fontFamily: "'Comic Neue', cursive",
   padding: 20,
   boxType: 'caption',
-  textBackgroundColor: 'transparent' // DEFAULT TANPA PENIMPA
+  textBackgroundColor: 'transparent'
 };
 
-export const FONT_OPTIONS = [
-  { name: 'Formal', value: 'Inter' },
-  { name: 'Casual', value: 'sans-serif' },
-  { name: 'Fun', value: "'Comic Neue', cursive" },
-  { name: 'Horror / Action', value: 'Bangers' }
-];
+export const getFileCacheKey = (fileName: string, fileSize: number) => `zen-cache-${fileName}-${fileSize}`;
 
 export const savePageToCache = (page: Page) => {
-  const key = `zen-cache-${page.fileName}-${page.fileSize || 0}`;
+  const key = getFileCacheKey(page.fileName, page.fileSize || 0);
   localStorage.setItem(key, JSON.stringify({ textObjects: page.textObjects, overrideStyle: page.overrideStyle }));
 };
 
 export const loadPageFromCache = (fileName: string, fileSize: number): any | null => {
-  const saved = localStorage.getItem(`zen-cache-${fileName}-${fileSize}`);
+  const saved = localStorage.getItem(getFileCacheKey(fileName, fileSize));
   return saved ? JSON.parse(saved) : null;
 };
 

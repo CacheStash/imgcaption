@@ -42,7 +42,6 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     fCanvas.renderAll();
   }, [activeStyle]);
 
-  // SMART RE-FILL LOGIC
   const addSmartMask = useCallback((event: any) => {
     if (!isMaskMode || !fabricCanvasRef.current) return;
     const fCanvas = fabricCanvasRef.current;
@@ -68,7 +67,7 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     fCanvas.on('selection:cleared', () => onSelectText(null));
     fCanvas.on('mouse:down', (e: any) => { if(isMaskMode) addSmartMask(e); });
     return () => fCanvas.dispose();
-  }, [isMaskMode, addSmartMask]);
+  }, [isMaskMode, addSmartMask, onSelectText]);
 
   useEffect(() => {
     if (!fabricCanvasRef.current) return;
@@ -86,7 +85,7 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
             width: obj.boxType === 'caption' ? fCanvas.width - (activeStyle.padding * 2) : 280,
             fontSize: obj.fontSize, fill: obj.color, textAlign: obj.alignment, fontFamily: obj.fontFamily,
             stroke: obj.outlineColor, strokeWidth: obj.outlineWidth, strokeUniform: true, paintFirst: 'stroke',
-            backgroundColor: obj.textBackgroundColor !== 'transparent' ? obj.textBackgroundColor : null, // FITUR PENIMPA
+            backgroundColor: obj.textBackgroundColor !== 'transparent' ? obj.textBackgroundColor : null,
             data: { id: obj.id, type: 'text' }, shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur })
           });
           fCanvas.add(tBox);
@@ -99,13 +98,41 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   return (
     <div className="w-full flex flex-col items-center gap-4">
       <div className="flex gap-2 bg-slate-800 p-2 rounded-xl border border-slate-700 shadow-lg">
-        <button onClick={() => setIsMaskMode(!isMaskMode)} className={`px-4 h-8 rounded text-xs font-bold ${isMaskMode ? 'bg-blue-500' : 'bg-slate-900 text-blue-400 border border-blue-900/50'}`}>+ SMART MASK</button>
-        <div className="w-px h-6 bg-slate-700 mx-2"></div>
-        <select value={activeStyle.fontFamily} onChange={(e) => onUpdateOverride({...activeStyle, fontFamily: e.target.value})} className="bg-slate-900 text-[10px] px-2 h-8 rounded border border-slate-700 outline-none">
+        <button 
+          onClick={() => setIsMaskMode(!isMaskMode)} 
+          className={`px-4 h-8 rounded text-xs font-bold transition-all ${isMaskMode ? 'bg-blue-600' : 'bg-slate-900 text-blue-400 border border-blue-900/50'}`}
+        >
+          {isMaskMode ? 'Click on Balloon...' : '+ SMART MASK'}
+        </button>
+        <div className="w-px h-6 bg-slate-700 mx-1"></div>
+        <select 
+          value={activeStyle.fontFamily} 
+          onChange={(e) => onUpdateOverride({...activeStyle, fontFamily: e.target.value})} 
+          className="bg-slate-900 text-[10px] px-2 h-8 rounded outline-none border border-slate-700 text-slate-200"
+        >
           {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
         </select>
+        <div className="w-px h-6 bg-slate-700 mx-1"></div>
+        <select 
+          value={activeStyle.alignment} 
+          onChange={(e) => onUpdateOverride({...activeStyle, alignment: e.target.value as Alignment})} 
+          className="bg-transparent text-[10px] px-2 outline-none text-slate-200"
+        >
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+        </select>
+        <select 
+          value={activeStyle.verticalAlign} 
+          onChange={(e) => onUpdateOverride({...activeStyle, verticalAlign: e.target.value as VerticalAlignment})} 
+          className="bg-transparent text-[10px] px-2 outline-none text-slate-200"
+        >
+          <option value="top">Top</option>
+          <option value="middle">Middle</option>
+          <option value="bottom">Bottom</option>
+        </select>
       </div>
-      <div ref={containerRef} className="w-full flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative">
+      <div ref={containerRef} className="w-full flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden">
         <canvas ref={canvasRef} />
       </div>
     </div>
