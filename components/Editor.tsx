@@ -18,12 +18,11 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isMaskMode, setIsMaskMode] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
 
   const activeStyle = page.overrideStyle || globalStyle;
 
-  // --- FIX BLANK SCREEN: ResizeObserver ---
+  // FIX BLANK: ResizeObserver untuk menjamin lebar kontainer
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver(entries => {
@@ -56,69 +55,34 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
     fCanvas.renderAll();
   }, [activeStyle]);
 
-  const addSmartMask = useCallback((event: any) => {
-    if (!isMaskMode || !fabricCanvasRef.current) return;
-    const fCanvas = fabricCanvasRef.current;
-    const pointer = fCanvas.getPointer(event.e);
-    const ctx = fCanvas.getContext();
-    const pixel = ctx.getImageData(event.e.offsetX, event.e.offsetY, 1, 1).data;
-    const color = `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
-
-    const mask = new fabric.Rect({
-      left: pointer.x - 50, top: pointer.y - 30,
-      width: 100, height: 60, fill: color, rx: 15, ry: 15,
-      data: { type: 'mask' }
-    });
-    fCanvas.add(mask);
-    setIsMaskMode(false);
-  }, [isMaskMode]);
-
-  // Inisialisasi Canvas
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { backgroundColor: '#0f172a', preserveObjectStacking: true });
     fabricCanvasRef.current = fCanvas;
     fCanvas.on('selection:created', (e: any) => onSelectText(e.selected[0]?.data?.id));
     fCanvas.on('selection:cleared', () => onSelectText(null));
-    fCanvas.on('mouse:down', (e: any) => { if(isMaskMode) addSmartMask(e); });
     return () => fCanvas.dispose();
-  }, [isMaskMode, addSmartMask, onSelectText]);
+  }, [onSelectText]);
 
-  // Render Image & Text
   useEffect(() => {
     if (!fabricCanvasRef.current || containerWidth === 0) return;
     const fCanvas = fabricCanvasRef.current;
-    
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
       if (!img) return;
       const scale = containerWidth / img.width;
-      const finalW = img.width * scale;
-      const finalH = img.height * scale;
-      fCanvas.setDimensions({ width: finalW, height: finalH });
+      fCanvas.setDimensions({ width: img.width * scale, height: img.height * scale });
       img.set({ scaleX: scale, scaleY: scale, selectable: false, evented: false });
-      
       fCanvas.setBackgroundImage(img, () => {
-        // Hapus objek teks lama sebelum re-render
-        const oldTexts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
-        oldTexts.forEach((o: any) => fCanvas.remove(o));
-
+        const texts = fCanvas.getObjects().filter((o: any) => o.data?.type === 'text');
+        texts.forEach((o: any) => fCanvas.remove(o));
         page.textObjects.forEach((obj) => {
-          // FIX TYPOGRAPHY & COLOR: Gunakan activeStyle untuk merespons perubahan global/override
-          const boxWidth = activeStyle.boxType === 'caption' ? finalW - (activeStyle.padding * 2) : 280;
-          
+          const boxWidth = activeStyle.boxType === 'caption' ? fCanvas.width - (activeStyle.padding * 2) : 280;
           const tBox = new fabric.Textbox(cleanText(obj.originalText, hideLabels), {
-            width: boxWidth, 
-            fontSize: activeStyle.fontSize, // Pakai activeStyle
-            fill: activeStyle.color,        // Pakai activeStyle
-            textAlign: activeStyle.alignment, 
-            fontFamily: activeStyle.fontFamily, // Pakai activeStyle
-            stroke: activeStyle.outlineColor, 
-            strokeWidth: activeStyle.outlineWidth, 
-            strokeUniform: true, 
-            paintFirst: 'stroke',
-            backgroundColor: activeStyle.textBackgroundColor !== 'transparent' ? activeStyle.textBackgroundColor : null,
-            data: { id: obj.id, type: 'text' }, 
-            shadow: new fabric.Shadow({ color: activeStyle.glowColor, blur: activeStyle.glowBlur })
+            width: boxWidth, fontSize: activeStyle.fontSize, fill: activeStyle.color,
+            textAlign: activeStyle.alignment, fontFamily: activeStyle.fontFamily,
+            stroke: activeStyle.outlineColor, strokeWidth: activeStyle.outlineWidth,
+            strokeUniform: true, paintFirst: 'stroke',
+            data: { id: obj.id, type: 'text' }, shadow: new fabric.Shadow({ color: activeStyle.glowColor, blur: activeStyle.glowBlur })
           });
           fCanvas.add(tBox);
         });
@@ -129,14 +93,7 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, globa
 
   return (
     <div className="w-full flex flex-col items-center gap-4">
-      <div className="flex gap-2 bg-slate-800 p-2 rounded-xl border border-slate-700 shadow-lg">
-        <button onClick={() => setIsMaskMode(!isMaskMode)} className={`px-4 h-8 rounded text-xs font-bold transition-all ${isMaskMode ? 'bg-blue-600' : 'bg-slate-900 text-blue-400 border border-blue-900/50 hover:bg-slate-800'}`}>+ SMART MASK</button>
-        <div className="w-px h-6 bg-slate-700 mx-1"></div>
-        <select value={activeStyle.fontFamily} onChange={(e) => onUpdateOverride({...activeStyle, fontFamily: e.target.value})} className="bg-slate-900 text-[10px] px-2 h-8 rounded border border-slate-700 outline-none text-slate-200">
-          {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
-        </select>
-      </div>
-      <div ref={containerRef} className="w-full max-w-4xl flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[400px]">
+      <div ref={containerRef} className="w-full max-w-4xl flex justify-center shadow-2xl bg-slate-800 rounded-sm overflow-hidden relative min-h-[500px]">
         <canvas ref={canvasRef} />
       </div>
     </div>

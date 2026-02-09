@@ -11,9 +11,12 @@ interface SidebarProps {
   onClearAll: () => void;
   onUpdateGlobalStyle: (style: TextStyle) => void;
   onUpdatePageStyle: (style: TextStyle | undefined) => void;
+  onExport: () => void; // PROPS BARU
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ state, setState, onTextImport, onUpdateText, onAddText, onClearAll, onUpdateGlobalStyle, onUpdatePageStyle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  state, setState, onTextImport, onUpdateText, onAddText, onClearAll, onUpdateGlobalStyle, onUpdatePageStyle, onExport 
+}) => {
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
   const isUsingOverride = !!selectedPage?.overrideStyle;
   const currentStyle = selectedPage?.overrideStyle || state.globalStyle;
@@ -26,9 +29,20 @@ const Sidebar: React.FC<SidebarProps> = ({ state, setState, onTextImport, onUpda
 
   return (
     <aside className="w-80 border-r border-slate-800 flex flex-col bg-slate-950 p-6 space-y-6 overflow-y-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">ZenReader Pro</h1>
-        <button onClick={onClearAll} className="p-2 text-slate-600 hover:text-red-500 transition-colors text-xs font-bold">RESET ALL</button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">ZenReader Pro</h1>
+          <button onClick={onClearAll} className="p-2 text-slate-600 hover:text-red-500 transition-colors text-xs font-bold">RESET</button>
+        </div>
+        
+        {/* TOMBOL EXPORT DI SINI (SESUAI PERMINTAAN) */}
+        <button 
+          onClick={onExport}
+          disabled={state.pages.length === 0}
+          className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:bg-slate-800 disabled:text-slate-600 rounded-xl text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2"
+        >
+          <span>📦</span> EXPORT ZIP (IMAGES)
+        </button>
       </div>
 
       {/* TYPOGRAPHY SECTION */}
@@ -38,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ state, setState, onTextImport, onUpda
           {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
         </select>
         <div className="flex gap-2">
-          <input type="color" value={currentStyle.color} onChange={(e) => handleStyleChange({ color: e.target.value })} className="w-10 h-8 bg-transparent cursor-pointer" />
+          <input type="color" value={currentStyle.color} onChange={(e) => handleStyleChange({ color: e.target.value })} className="w-10 h-8 bg-transparent border-none cursor-pointer" />
           <input type="number" value={currentStyle.fontSize} onChange={(e) => handleStyleChange({ fontSize: Number(e.target.value) })} className="flex-1 h-8 bg-slate-950 border border-slate-700 rounded text-xs px-2 text-white" />
         </div>
       </section>
@@ -75,7 +89,6 @@ const Sidebar: React.FC<SidebarProps> = ({ state, setState, onTextImport, onUpda
         </div>
       </section>
 
-      {/* ADDITIONAL SETTINGS (RESTORED HIDE CHARACTER NAME) */}
       <section className="space-y-4">
         <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-900/40 rounded-lg border border-slate-800 hover:bg-slate-800 transition-colors">
           <input type="checkbox" checked={state.hideLabels} onChange={(e) => setState(p => ({ ...p, hideLabels: e.target.checked }))} className="w-4 h-4 rounded border-slate-700 bg-slate-900" />
