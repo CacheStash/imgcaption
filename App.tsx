@@ -299,9 +299,7 @@ const App: React.FC = () => {
       />
       <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
         {state.pages.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <Uploader onUpload={handleUpload} />
-          </div>
+          <div className="h-full w-full"> <Uploader onUpload={handleUpload} variant="full" /> </div>
         ) : (
           <>
             {state.isGalleryView ? (
