@@ -1,4 +1,4 @@
-// FULL REWRITE - Memperbaiki isolasi Local Style
+// FULL REWRITE - Memperbaiki isolasi Local Style, Export Mismatch, dan Delete Key Support
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle, ImportMode } from './types';
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
@@ -72,14 +72,31 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, pages: next }));
   }, [history, state.pages]);
 
+  // FIX: Fungsi hapus teks yang dipilih
+  const deleteSelectedText = useCallback(() => {
+    if (!state.selectedPageId || !state.selectedTextId) return;
+    recordHistory();
+    setState(prev => ({
+      ...prev,
+      selectedTextId: null,
+      pages: prev.pages.map(p => {
+        if (p.id !== prev.selectedPageId) return p;
+        return { ...p, textObjects: p.textObjects.filter(t => t.id !== prev.selectedTextId) };
+      })
+    }));
+  }, [state.selectedPageId, state.selectedTextId, recordHistory]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isTyping = ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName);
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+      // FIX: Key listener untuk Delete
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping) { deleteSelectedText(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, deleteSelectedText]);
 
   useEffect(() => {
     localStorage.setItem('comic-editor-state-v10', JSON.stringify({
@@ -173,7 +190,6 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // Perbaikan Isolasi Local Style: Jika local active, tidak mengubah globalStyle
   const updateGlobalStyle = useCallback((newStyle: TextStyle) => {
     const { x, y } = getPosFromAlign(newStyle.alignment, newStyle.verticalAlignment);
     setState(prev => {
@@ -181,13 +197,10 @@ const App: React.FC = () => {
       
       const newPages = prev.pages.map(page => {
         if (isLocalActive) {
-          // Hanya update halaman yang sedang dipilih jika Local Style aktif
           if (page.id !== prev.selectedPageId) return page;
           return { ...page, localStyle: newStyle, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
         }
-        // Jika Local Style halaman lain aktif, jangan timpa dengan global update
         if (page.isLocalStyle) return page;
-        // Update halaman global biasa
         return { ...page, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
       });
 
@@ -217,37 +230,49 @@ const App: React.FC = () => {
     
     return new Promise<string>((resolve) => {
       fabric.Image.fromURL(page.imageUrl, (img: any) => {
-        const originalWidth = img.width;
-        const originalHeight = img.height;
-        staticCanvas.setDimensions({ width: originalWidth, height: originalHeight });
+        const oW = img.width;
+        const oH = img.height;
+        staticCanvas.setDimensions({ width: oW, height: oH });
         staticCanvas.setBackgroundImage(img, staticCanvas.renderAll.bind(staticCanvas));
         
-        const scalingFactor = originalWidth / previewWidth;
+        const scale = oW / previewWidth;
 
         page.textObjects.forEach((obj) => {
           const displayContent = cleanText(obj.originalText, state.hideLabels);
-          const finalWidth = state.importMode === 'full' 
-            ? originalWidth - ((obj.paddingLeft + obj.paddingRight + 40) * scalingFactor)
-            : obj.width * scalingFactor;
+          const fWidth = state.importMode === 'full' 
+            ? oW - ((obj.paddingLeft + obj.paddingRight + 40) * scale)
+            : obj.width * scale;
 
-          const fabricObj = new fabric.Textbox(displayContent, {
-            left: (obj.x / 100) * originalWidth,
-            top: (obj.y / 100) * originalHeight,
-            width: finalWidth,
-            fontSize: obj.fontSize * scalingFactor,
+          const fObj = new fabric.Textbox(displayContent, {
+            width: fWidth,
+            fontSize: obj.fontSize * scale,
             padding: 0,
             fill: obj.color,
             textAlign: 'center',
             originX: 'center',
             originY: 'center',
             stroke: obj.outlineColor,
-            strokeWidth: obj.outlineWidth * scalingFactor,
+            strokeWidth: obj.outlineWidth * scale,
             strokeUniform: true,
             paintFirst: 'stroke',
             fontFamily: obj.fontFamily || 'Inter',
-            shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur * scalingFactor, offsetX: 0, offsetY: 0, opacity: obj.glowOpacity, nonScaling: true })
+            shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur * scale, offsetX: 0, offsetY: 0, opacity: obj.glowOpacity, nonScaling: true })
           });
-          staticCanvas.add(fabricObj);
+
+          // FIX: Sinkronisasi Boundary Clamping pada Export
+          fObj.setCoords();
+          const objH = fObj.height;
+          const minX = (obj.paddingLeft * scale) + (fWidth / 2);
+          const maxX = oW - (obj.paddingRight * scale) - (fWidth / 2);
+          const minY = (obj.paddingTop * scale) + (objH / 2);
+          const maxY = oH - (obj.paddingBottom * scale) - (objH / 2);
+
+          fObj.set({
+            left: Math.max(minX, Math.min(maxX, (obj.x / 100) * oW)),
+            top: Math.max(minY, Math.min(maxY, (obj.y / 100) * oH))
+          });
+
+          staticCanvas.add(fObj);
         });
         
         staticCanvas.renderAll();

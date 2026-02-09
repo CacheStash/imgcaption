@@ -1,4 +1,4 @@
-// FULL REWRITE - Memperbaiki Boundary Clamping untuk wrapped text 
+// FULL REWRITE - Memperbaiki Boundary Clamping & Fix Selection Bug
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Page, TextObject, ImportMode } from '../types';
 import { cleanText } from '../utils/helpers';
@@ -159,27 +159,19 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, impor
         fabricObj = new fabric.Textbox(displayContent, { ...props, data: { id: obj.id }, lockScalingY: true });
         fCanvas.add(fabricObj);
       } else {
+        // FIX: Jangan menimpa properti jika sedang diedit untuk mencegah Selection Bug
         if (fabricObj !== fCanvas.getActiveObject() || !fabricObj.isEditing) fabricObj.set(props);
       }
 
-      // PERBAIKAN: Kalkulasi Boundary Clamping dinamis berdasarkan tinggi asli fabricObj 
       fabricObj.setCoords();
       const objHeight = fabricObj.height * (fabricObj.scaleY || 1);
-      
-      // Hitung batas aman Y berdasarkan tinggi objek yang sudah ter-wrap
       const minY = obj.paddingTop + (objHeight / 2);
       const maxY = containerSize.height - obj.paddingBottom - (objHeight / 2);
-
-      const rawPosX = (obj.x / 100) * containerSize.width;
-      const rawPosY = (obj.y / 100) * containerSize.height;
-
-      // Clamp X tetap menggunakan finalWidth
       const minX = obj.paddingLeft + (finalWidth / 2);
       const maxX = containerSize.width - obj.paddingRight - (finalWidth / 2);
 
-      const posX = Math.max(minX, Math.min(maxX, rawPosX));
-      // Teks akan otomatis terdorong ke atas jika memanjang melebihi maxY
-      const posY = Math.max(minY, Math.min(maxY, rawPosY));
+      const posX = Math.max(minX, Math.min(maxX, (obj.x / 100) * containerSize.width));
+      const posY = Math.max(minY, Math.min(maxY, (obj.y / 100) * containerSize.height));
 
       fabricObj.set({ left: posX, top: posY });
     });
