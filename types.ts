@@ -1,15 +1,20 @@
 export type Alignment = 'left' | 'center' | 'right';
+export type VerticalAlignment = 'top' | 'middle' | 'bottom';
+export type BoxType = 'caption' | 'dialogue';
 
 export interface TextStyle {
   fontSize: number;
   color: string;
   alignment: Alignment;
+  verticalAlign: VerticalAlignment; // Untuk posisi vertikal global
   outlineColor: string;
   outlineWidth: number;
   glowColor: string;
   glowBlur: number;
   glowOpacity: number;
   fontFamily: string;
+  padding: number;       // Safe area/margin dari pinggir gambar
+  boxType: BoxType;      // Tipe box: panjang (caption) atau kotak (dialogue)
 }
 
 export interface TextObject extends TextStyle {
@@ -20,7 +25,6 @@ export interface TextObject extends TextStyle {
   width: number; // pixels
 }
 
-// Tambahan untuk Speech Bubble
 export type BubbleStyle = 'speech' | 'thought' | 'scream' | 'square';
 
 export interface BubbleObject {
@@ -47,7 +51,7 @@ export interface Page {
   imageUrl: string;
   fileName: string;
   textObjects: TextObject[];
-  bubbles: BubbleObject[]; // Tambahkan ini
+  bubbles: BubbleObject[];
 }
 
 export interface AppState {
@@ -55,7 +59,7 @@ export interface AppState {
   hideLabels: boolean;
   selectedPageId: string | null;
   selectedTextId: string | null;
-  selectedBubbleId: string | null; // Tambahkan tracking untuk balon
+  selectedBubbleId: string | null;
   isGalleryView: boolean;
   globalStyle: TextStyle;
   savedStyles: SavedStyle[];
