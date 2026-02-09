@@ -1,12 +1,12 @@
-
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Page, TextObject } from '../types';
+import { Page, TextObject, ImportMode } from '../types';
 import { cleanText } from '../utils/helpers';
 
 interface EditorProps {
   page: Page;
   hideLabels: boolean;
   selectedTextId: string | null;
+  importMode: ImportMode;
   onUpdateText: (textId: string, updates: Partial<TextObject>) => void;
   onSelectText: (id: string | null) => void;
   onRecordHistory: () => void;
@@ -15,7 +15,7 @@ interface EditorProps {
 
 declare const fabric: any;
 
-const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpdateText, onSelectText, onRecordHistory, onResize }) => {
+const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, importMode, onUpdateText, onSelectText, onRecordHistory, onResize }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
   const isRenderingRef = useRef(false);
@@ -25,14 +25,11 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpd
   const callbacks = useRef({ onUpdateText, onSelectText, onRecordHistory, onResize });
   useEffect(() => { callbacks.current = { onUpdateText, onSelectText, onRecordHistory, onResize }; }, [onUpdateText, onSelectText, onRecordHistory, onResize]);
 
-  // Enhanced stacking: ensuring vertical hierarchy for merged blocks
   const resolveStacking = useCallback((fCanvas: any) => {
     const textboxes = fCanvas.getObjects().filter((o: any) => o.data?.id);
     if (textboxes.length <= 1) return;
 
-    // Stable sort based on current top position to maintain visual hierarchy
     textboxes.sort((a: any, b: any) => a.top - b.top);
-
     const PADDING = 15;
     let changed = false;
 
@@ -43,12 +40,9 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpd
       for (let j = 0; j < i; j++) {
         const above = textboxes[j];
         const aboveRect = above.getBoundingRect();
-
-        // Horizontal intersection check
         const overlapX = (currentRect.left < aboveRect.left + aboveRect.width) && 
                          (currentRect.left + currentRect.width > aboveRect.left);
         
-        // If overlapping horizontally and vertically too close, shift down
         if (overlapX && currentRect.top < aboveRect.top + aboveRect.height + PADDING) {
           current.set({ top: aboveRect.top + aboveRect.height + PADDING });
           current.setCoords();
@@ -56,7 +50,6 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpd
         }
       }
     }
-
     if (changed) fCanvas.renderAll();
   }, []);
 
@@ -80,41 +73,31 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpd
       const obj = e.target;
       if (obj && obj.data?.id) {
         callbacks.current.onRecordHistory();
-        resolveStacking(fCanvas);
-
+        
         const bgWidth = fCanvas.backgroundImage?.width * fCanvas.backgroundImage?.scaleX || 1;
         const bgHeight = fCanvas.backgroundImage?.height * fCanvas.backgroundImage?.scaleY || 1;
-        const bgLeft = fCanvas.backgroundImage?.left || 0;
-        const bgTop = fCanvas.backgroundImage?.top || 0;
 
         fCanvas.getObjects().forEach((canvasObj: any) => {
           if (canvasObj.data?.id) {
-            // Recalculate percentages while accounting for padding offsets
-            const relX = ((canvasObj.left - bgLeft) / bgWidth) * 100;
-            const relY = ((canvasObj.top - bgTop) / bgHeight) * 100;
+            const relX = (canvasObj.left / bgWidth) * 100;
+            const relY = (canvasObj.top / bgHeight) * 100;
             const newWidth = canvasObj.width * canvasObj.scaleX;
             canvasObj.set({ width: newWidth, scaleX: 1, scaleY: 1 });
             callbacks.current.onUpdateText(canvasObj.data.id, { x: relX, y: relY, width: newWidth });
           }
         });
-      }
-    };
-    
-    const handleTextChanged = (e: any) => {
-      if (isRenderingRef.current) return;
-      const obj = e.target;
-      if (obj && obj.data?.id) {
-        // We only update the originalText if we are not hiding labels
-        // If we ARE hiding labels, this is trickier because we need to preserve the "Name: " part.
-        // For simplicity and user expectation: we update the original text directly.
-        // If hideLabels is true, the user is only editing the dialogue part they see.
-        callbacks.current.onUpdateText(obj.data.id, { originalText: obj.text });
         resolveStacking(fCanvas);
       }
     };
-
+    
     fCanvas.on('object:modified', handleModified);
-    fCanvas.on('text:changed', handleTextChanged);
+    fCanvas.on('text:changed', (e: any) => {
+      if (isRenderingRef.current) return;
+      if (e.target?.data?.id) {
+        callbacks.current.onUpdateText(e.target.data.id, { originalText: e.target.text });
+        resolveStacking(fCanvas);
+      }
+    });
     
     return () => { if (fabricCanvasRef.current) { fabricCanvasRef.current.dispose(); fabricCanvasRef.current = null; } };
   }, [resolveStacking]);
@@ -150,24 +133,34 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpd
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
     isRenderingRef.current = true;
-    const currentObjects = fCanvas.getObjects();
-    const objectIds = page.textObjects.map(t => t.id);
-    currentObjects.forEach((obj: any) => { if (obj.data?.id && !objectIds.includes(obj.data.id)) fCanvas.remove(obj); });
 
     page.textObjects.forEach((obj) => {
       const displayContent = cleanText(obj.originalText, hideLabels);
       let fabricObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id);
       
-      // Calculate position including padding offsets
-      const posX = ((obj.x / 100) * containerSize.width) + (obj.paddingLeft - obj.paddingRight);
-      const posY = ((obj.y / 100) * containerSize.height) + (obj.paddingTop - obj.paddingBottom);
+      // Calculate Width: Mode Full vs Mode Box
+      const finalWidth = importMode === 'full' 
+        ? containerSize.width - (obj.paddingLeft + obj.paddingRight + 40)
+        : obj.width;
+
+      // Boundary Clamping Calculation
+      const minX = obj.paddingLeft + (finalWidth / 2);
+      const maxX = containerSize.width - obj.paddingRight - (finalWidth / 2);
+      const minY = obj.paddingTop + (obj.fontSize / 2);
+      const maxY = containerSize.height - obj.paddingBottom - (obj.fontSize / 2);
+
+      const rawPosX = (obj.x / 100) * containerSize.width;
+      const rawPosY = (obj.y / 100) * containerSize.height;
+
+      const posX = Math.max(minX, Math.min(maxX, rawPosX));
+      const posY = Math.max(minY, Math.min(maxY, rawPosY));
 
       const props = {
         left: posX,
         top: posY,
-        width: obj.width,
+        width: finalWidth,
         fontSize: obj.fontSize,
-        padding: Math.max(obj.paddingTop, obj.paddingRight, obj.paddingBottom, obj.paddingLeft),
+        padding: 0, 
         fill: obj.color,
         textAlign: 'center',
         originX: 'center',
@@ -186,32 +179,19 @@ const Editor: React.FC<EditorProps> = ({ page, hideLabels, selectedTextId, onUpd
         fabricObj = new fabric.Textbox(displayContent, { ...props, data: { id: obj.id }, lockScalingY: true });
         fCanvas.add(fabricObj);
       } else {
-        // Important: Update properties only if not currently being edited by user to avoid cursor jumping
-        if (fabricObj !== fCanvas.getActiveObject() || !fabricObj.isEditing) {
-          fabricObj.set(props);
-        } else {
-          // While editing, we only update styling, not the text itself from props
-          fabricObj.set({ 
-            fontSize: props.fontSize, 
-            padding: props.padding,
-            fill: props.fill, 
-            stroke: props.stroke, 
-            strokeWidth: props.strokeWidth, 
-            fontFamily: props.fontFamily, 
-            shadow: props.shadow 
-          }); 
-        }
+        if (fabricObj !== fCanvas.getActiveObject() || !fabricObj.isEditing) fabricObj.set(props);
+        else fabricObj.set({ fontSize: props.fontSize, fill: props.fill, stroke: props.stroke, strokeWidth: props.strokeWidth, fontFamily: props.fontFamily, shadow: props.shadow });
       }
     });
 
     const target = fCanvas.getObjects().find((o: any) => o.data?.id === selectedTextId);
-    if (target) { if (fCanvas.getActiveObject() !== target) fCanvas.setActiveObject(target); }
-    else fCanvas.discardActiveObject();
+    if (target && fCanvas.getActiveObject() !== target) fCanvas.setActiveObject(target);
+    else if (!selectedTextId) fCanvas.discardActiveObject();
 
     resolveStacking(fCanvas);
     fCanvas.renderAll();
     setTimeout(() => { isRenderingRef.current = false; }, 50);
-  }, [page.textObjects, containerSize, hideLabels, selectedTextId, resolveStacking]);
+  }, [page.textObjects, containerSize, hideLabels, selectedTextId, importMode, resolveStacking]);
 
   return (<div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden shadow-inner border border-slate-800 min-h-[400px]"><canvas ref={canvasRef} /></div>);
 };

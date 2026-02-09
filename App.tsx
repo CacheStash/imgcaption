@@ -1,7 +1,5 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle, ImportMode } from './types';
-// Removed autoWrapText as it is not exported by helpers.ts and not used in this component
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
 import Sidebar from './components/Sidebar';
 import Gallery from './components/Gallery';
@@ -42,7 +40,6 @@ const App: React.FC = () => {
     return initial;
   });
 
-  // Fix: Defined selectedPage and currentPageIndex for global usage in the component body
   const selectedPage = useMemo(() => 
     state.pages.find(p => p.id === state.selectedPageId),
   [state.pages, state.selectedPageId]);
@@ -218,13 +215,18 @@ const App: React.FC = () => {
 
         page.textObjects.forEach((obj) => {
           const displayContent = cleanText(obj.originalText, state.hideLabels);
-          // Apply 4-way padding by offsetting position (since Fabric Textbox padding is uniform)
+          
+          // Apply dynamic width for full-width support in export
+          const finalWidth = state.importMode === 'full' 
+            ? originalWidth - ((obj.paddingLeft + obj.paddingRight + 40) * scalingFactor)
+            : obj.width * scalingFactor;
+
           const fabricObj = new fabric.Textbox(displayContent, {
-            left: ((obj.x / 100) * originalWidth) + ((obj.paddingLeft - obj.paddingRight) * scalingFactor),
-            top: ((obj.y / 100) * originalHeight) + ((obj.paddingTop - obj.paddingBottom) * scalingFactor),
-            width: obj.width * scalingFactor,
+            left: (obj.x / 100) * originalWidth,
+            top: (obj.y / 100) * originalHeight,
+            width: finalWidth,
             fontSize: obj.fontSize * scalingFactor,
-            padding: Math.max(obj.paddingTop, obj.paddingRight, obj.paddingBottom, obj.paddingLeft) * scalingFactor,
+            padding: 0,
             fill: obj.color,
             textAlign: 'center',
             originX: 'center',
@@ -285,10 +287,16 @@ const App: React.FC = () => {
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
+        onUpload={handleUpload}
       />
       <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
         {state.pages.length === 0 ? (
-          <div className="h-full flex items-center justify-center"><Uploader onUpload={handleUpload} /></div>
+          <div className="h-full flex flex-col items-center justify-center text-slate-500 italic">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mb-4 opacity-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p>Upload comic pages from sidebar to begin.</p>
+          </div>
         ) : (
           <>
             {state.isGalleryView ? (
@@ -307,7 +315,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3"><div className="text-right"><p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p><p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p></div></div>
                 </div>
-                {selectedPage && <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} selectedTextId={state.selectedTextId} onSelectText={handleSelectText} onRecordHistory={recordHistory} onResize={setPreviewWidth} />}
+                {selectedPage && <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={state.importMode} onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} selectedTextId={state.selectedTextId} onSelectText={handleSelectText} onRecordHistory={recordHistory} onResize={setPreviewWidth} />}
               </div>
             )}
           </>
