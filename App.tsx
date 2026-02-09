@@ -195,7 +195,17 @@ const App: React.FC = () => {
   const goToNextPage = useCallback(() => {
     setState(prev => {
       const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
-      if (idx >= 0 && idx < prev.pages.length - 1) return { ...prev, selectedPageId: prev.pages[idx + 1].id, selectedTextId: null };
+     if (idx >= 0 && idx < prev.pages.length - 1) {
+        const targetId = prev.pages[idx + 1].id;
+        return { 
+          ...prev, 
+          selectedPageId: targetId, 
+          selectedTextId: null,
+          pages: prev.pages.map(p => (p.id === targetId && p.isLocalStyle === undefined) ? {
+            ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
+          } : p)
+        };
+      }
       return prev;
     });
   }, []);
