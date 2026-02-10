@@ -31,7 +31,7 @@ const Editor: React.FC<EditorProps> = ({
   const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize });
   useEffect(() => { callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
-  // Helper untuk Clamp (Anti-Nabrak Padding)
+  // Clamp Function (Anti-Nabrak Boundary)
   const clampPosition = useCallback((obj: any, data: TextObject) => {
     if (!containerSize.width || !containerSize.height) return;
     const width = obj.width * obj.scaleX;
@@ -47,17 +47,11 @@ const Editor: React.FC<EditorProps> = ({
     let newLeft = obj.left;
     let newTop = obj.top;
 
-    if (maxLeft > minLeft) {
-      newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
-    } else {
-      newLeft = (minLeft + maxLeft) / 2;
-    }
+    if (maxLeft > minLeft) newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+    else newLeft = (minLeft + maxLeft) / 2;
 
-    if (maxTop > minTop) {
-      newTop = Math.max(minTop, Math.min(newTop, maxTop));
-    } else {
-      newTop = (minTop + maxTop) / 2;
-    }
+    if (maxTop > minTop) newTop = Math.max(minTop, Math.min(newTop, maxTop));
+    else newTop = (minTop + maxTop) / 2;
 
     if (newLeft !== obj.left || newTop !== obj.top) {
       obj.set({ left: newLeft, top: newTop });
@@ -65,40 +59,25 @@ const Editor: React.FC<EditorProps> = ({
     }
   }, [containerSize]);
 
-  // FIX: Stacking Logic - Mask Bawah -> Shape Tengah -> Teks Atas
+  // Stacking Logic: Mask (Back) -> Shapes (Middle) -> Text (Front)
   const resolveStacking = useCallback((fCanvas: any) => {
-    fCanvas.getObjects().forEach((obj: any) => { 
+    const objs = fCanvas.getObjects();
+    objs.forEach((obj: any) => { 
       if (obj.data?.type === 'mask') fCanvas.sendToBack(obj);
-      if (obj.data?.type === 'shape') fCanvas.moveTo(obj, 1); // Di atas mask
+      if (obj.data?.type === 'shape') fCanvas.moveTo(obj, objs.length > 2 ? 1 : 0);
       if (obj.data?.type === 'text') fCanvas.bringToFront(obj); 
     });
-
-    // Anti-Overlap untuk Teks (Fitur Lama)
-    const textboxes = fCanvas.getObjects().filter((o: any) => o.data?.id && o.data?.type === 'text');
-    if (textboxes.length <= 1) return;
-    textboxes.sort((a: any, b: any) => a.top - b.top);
-    const PADDING = 15;
-    let changed = false;
-    for (let i = 0; i < textboxes.length; i++) {
-      const current = textboxes[i];
-      const currentRect = current.getBoundingRect();
-      for (let j = 0; j < i; j++) {
-        const above = textboxes[j];
-        const aboveRect = above.getBoundingRect();
-        const overlapX = (currentRect.left < aboveRect.left + aboveRect.width) && (currentRect.left + currentRect.width > aboveRect.left);
-        if (overlapX && currentRect.top < aboveRect.top + aboveRect.height + PADDING) {
-          current.set({ top: aboveRect.top + aboveRect.height + PADDING });
-          current.setCoords();
-          changed = true;
-        }
-      }
-    }
-    if (changed) fCanvas.requestRenderAll();
+    fCanvas.requestRenderAll();
   }, []);
 
+  // INITIAL SETUP: Hanya running sekali (atau saat page ID berubah total)
   useEffect(() => {
     if (!canvasRef.current) return;
-    const fCanvas = new fabric.Canvas(canvasRef.current, { backgroundColor: '#0f172a', preserveObjectStacking: true, selection: true });
+    const fCanvas = new fabric.Canvas(canvasRef.current, { 
+      backgroundColor: '#0f172a', 
+      preserveObjectStacking: true, 
+      selection: true 
+    });
     fabricCanvasRef.current = fCanvas;
 
     fCanvas.on('selection:created', (e: any) => {
@@ -107,15 +86,8 @@ const Editor: React.FC<EditorProps> = ({
       if (obj?.data?.type === 'text') { callbacks.current.onSelectText(obj.data.id); callbacks.current.onSelectMask(null); }
       else if (obj?.data?.type === 'mask') { callbacks.current.onSelectMask(obj.data.id); callbacks.current.onSelectText(null); }
     });
-    fCanvas.on('selection:updated', (e: any) => {
-      if (isRenderingRef.current) return;
-      const obj = e.selected ? e.selected[0] : e.target;
-      if (obj?.data?.type === 'text') { callbacks.current.onSelectText(obj.data.id); callbacks.current.onSelectMask(null); }
-      else if (obj?.data?.type === 'mask') { callbacks.current.onSelectMask(obj.data.id); callbacks.current.onSelectText(null); }
-    });
-    fCanvas.on('selection:cleared', () => { 
-      if (!isRenderingRef.current) { callbacks.current.onSelectText(null); callbacks.current.onSelectMask(null); } 
-    });
+
+    fCanvas.on('selection:cleared', () => { if (!isRenderingRef.current) { callbacks.current.onSelectText(null); callbacks.current.onSelectMask(null); } });
 
     fCanvas.on('object:modified', (e: any) => {
       if (isRenderingRef.current) return;
@@ -123,7 +95,8 @@ const Editor: React.FC<EditorProps> = ({
       if (obj && obj.data?.id) {
         callbacks.current.onRecordHistory();
         const bg = fCanvas.backgroundImage;
-        const bW = bg ? bg.width * bg.scaleX : 1; const bH = bg ? bg.height * bg.scaleY : 1;
+        const bW = bg ? bg.width * bg.scaleX : 1; 
+        const bH = bg ? bg.height * bg.scaleY : 1;
         
         if (obj.data.type === 'text') {
           const textData = page.textObjects.find(t => t.id === obj.data.id);
@@ -137,30 +110,28 @@ const Editor: React.FC<EditorProps> = ({
     });
 
     fCanvas.on('text:changed', (e: any) => {
-      if (isRenderingRef.current) return;
-      if (e.target?.data?.type === 'text') {
+      if (isRenderingRef.current && e.target?.data?.type === 'text') {
         callbacks.current.onUpdateText(e.target.data.id, { originalText: e.target.text });
         resolveStacking(fCanvas);
       }
     });
 
     return () => { fCanvas.dispose(); fabricCanvasRef.current = null; };
-  }, [resolveStacking, clampPosition, page.textObjects, page.masks]);
+  }, [page.id, resolveStacking, clampPosition]); // FIX: Hanya reset jika Page ID berubah
 
-  // FIX: Poin 1 (Robust Image Loading with ResizeObserver)
+  // SYNC BACKGROUND: Memastikan gambar latar ter-load sempurna
   const syncCanvasSize = useCallback(() => {
-    if (!containerRef.current || !fabricCanvasRef.current) return;
     const fCanvas = fabricCanvasRef.current;
+    if (!containerRef.current || !fCanvas) return;
+    
     const { width: contWidth, height: contHeight } = containerRef.current.getBoundingClientRect();
-    if (contWidth === 0 || contHeight === 0) return; // Prevent 0 size errors
+    if (contWidth === 0) return;
 
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
-      if (!fCanvas || !img) return;
+      if (!img) return;
       const imgRatio = img.width / img.height; 
-      const containerRatio = contWidth / contHeight;
-      let finalWidth, finalHeight;
-      if (imgRatio > containerRatio) { finalWidth = contWidth; finalHeight = contWidth / imgRatio; }
-      else { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
+      let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
+      if (finalHeight > contHeight) { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
       
       fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
       img.set({ scaleX: finalWidth/img.width, scaleY: finalHeight/img.height, left: 0, top: 0, selectable: false, evented: false });
@@ -174,121 +145,72 @@ const Editor: React.FC<EditorProps> = ({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    // Gunakan ResizeObserver agar saat container muncul/berubah ukuran, canvas menyesuaikan
-    const resizeObserver = new ResizeObserver(() => syncCanvasSize());
-    resizeObserver.observe(containerRef.current);
-    syncCanvasSize(); // Initial call
-    return () => resizeObserver.disconnect();
+    const observer = new ResizeObserver(() => syncCanvasSize());
+    observer.observe(containerRef.current);
+    syncCanvasSize();
+    return () => observer.disconnect();
   }, [syncCanvasSize]);
 
-  // Sync Objects (Texts, Masks, and Shapes)
+  // SYNC OBJECTS: Render Teks, Mask, dan Dialog Shapes
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
     isRenderingRef.current = true;
     
-    // Cleanup removed objects
+    // 1. Cleanup removed objects
     const textIds = page.textObjects.map(t => t.id);
     const maskIds = (page.masks || []).map(m => m.id);
     fCanvas.getObjects().forEach((obj: any) => {
-      if (obj.data?.id) {
-        if (obj.data.type === 'text' && !textIds.includes(obj.data.id)) fCanvas.remove(obj);
-        if (obj.data.type === 'shape' && !textIds.includes(obj.data.id)) fCanvas.remove(obj); // Remove shape if text removed
-        if (obj.data.type === 'mask' && !maskIds.includes(obj.data.id)) fCanvas.remove(obj);
+      if (obj.data?.id && ((obj.data.type === 'text' && !textIds.includes(obj.data.id)) || (obj.data.type === 'mask' && !maskIds.includes(obj.data.id)) || (obj.data.type === 'shape' && !textIds.includes(obj.data.id)))) {
+        fCanvas.remove(obj);
       }
     });
 
-    // 1. Render Masks (Paint Bucket)
+    // 2. Render Masks (Paint Bucket)
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
-      const props = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center', strokeWidth: 0 };
-      if (!fObj) {
-        fObj = new fabric.Rect({ ...props, data: { id: mask.id, type: 'mask' } });
-        fCanvas.add(fObj);
-      } else if (fObj !== fCanvas.getActiveObject()) { fObj.set(props); }
+      const props = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
+      if (!fObj) { fCanvas.add(new fabric.Rect({ ...props, data: { id: mask.id, type: 'mask' } })); } 
+      else if (fObj !== fCanvas.getActiveObject()) { fObj.set(props); }
     });
 
-    // 2. Render Texts & Dialog Shapes
+    // 3. Render Texts & Dialog Shapes
     page.textObjects.forEach((obj) => {
       const content = cleanText(obj.originalText, hideLabels);
-      let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
-      
-      const fWidth = importMode === 'full' ? containerSize.width - (obj.paddingLeft + obj.paddingRight + 40) : obj.width;
       const posX = (obj.x / 100) * containerSize.width;
       const posY = (obj.y / 100) * containerSize.height;
+      const fWidth = importMode === 'full' ? containerSize.width - (obj.paddingLeft + obj.paddingRight + 40) : obj.width;
 
-      const textProps = { 
-        width: fWidth, fontSize: obj.fontSize, fill: obj.color, 
-        textAlign: 'center', originX: 'center', originY: 'center', 
-        fontFamily: obj.fontFamily || 'Inter', text: content, editable: true,
-        stroke: obj.outlineColor, strokeWidth: obj.outlineWidth || 0, strokeUniform: true, paintFirst: 'stroke',
-        shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur || 0, offsetX: 0, offsetY: 0, opacity: obj.glowOpacity, nonScaling: true })
-      };
-      
-      // Render Dialog Shape (Background)
+      // Render Shape (Background Dialog)
       if (obj.boxShape && obj.boxShape !== 'none') {
         let shapeObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'shape');
+        let textObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
         
-        // Perkiraan tinggi text (karena fObj mungkin belum ada/updated)
-        // Kita gunakan ukuran fObj jika ada, atau estimasi kasar
-        const currentHeight = fObj ? fObj.height * fObj.scaleY : obj.fontSize * 2;
-        const shapeWidth = fWidth + (obj.paddingLeft + obj.paddingRight); // Add padding visual
-        const shapeHeight = currentHeight + (obj.paddingTop + obj.paddingBottom);
+        const currentH = textObj ? textObj.height * textObj.scaleY : obj.fontSize * 2;
+        const sW = fWidth + (obj.paddingLeft + obj.paddingRight);
+        const sH = currentH + (obj.paddingTop + obj.paddingBottom);
 
-        const shapeProps = {
-          left: posX, top: posY, width: shapeWidth, height: shapeHeight,
-          fill: obj.backgroundColor || 'transparent', originX: 'center', originY: 'center',
-          selectable: false, evented: false, // Non-interactive background
-          rx: obj.boxShape === 'rounded' ? 20 : 0,
-          ry: obj.boxShape === 'rounded' ? 20 : 0
-        };
+        const sProps = { left: posX, top: posY, width: sW, height: sH, fill: obj.backgroundColor || '#ffffff', originX: 'center', originY: 'center', selectable: false, evented: false };
 
         if (!shapeObj) {
-          if (obj.boxShape === 'oval') {
-             shapeObj = new fabric.Ellipse({ ...shapeProps, rx: shapeWidth/2, ry: shapeHeight/2, data: { id: obj.id, type: 'shape' } });
-          } else {
-             shapeObj = new fabric.Rect({ ...shapeProps, data: { id: obj.id, type: 'shape' } });
-          }
-          fCanvas.add(shapeObj);
-          fCanvas.sendToBack(shapeObj); // Ensure behind text
+          const newShape = obj.boxShape === 'oval' ? new fabric.Ellipse({ ...sProps, rx: sW/2, ry: sH/2 }) : new fabric.Rect({ ...sProps, rx: obj.boxShape === 'rounded' ? 20 : 0, ry: obj.boxShape === 'rounded' ? 20 : 0 });
+          newShape.set('data', { id: obj.id, type: 'shape' });
+          fCanvas.add(newShape);
         } else {
-          // Update shape type if needed (destroy and recreate if changing rect <-> ellipse)
-          const isEllipse = shapeObj.type === 'ellipse';
-          const wantOval = obj.boxShape === 'oval';
-          
-          if (isEllipse !== wantOval) {
-             fCanvas.remove(shapeObj);
-             if (wantOval) shapeObj = new fabric.Ellipse({ ...shapeProps, rx: shapeWidth/2, ry: shapeHeight/2, data: { id: obj.id, type: 'shape' } });
-             else shapeObj = new fabric.Rect({ ...shapeProps, data: { id: obj.id, type: 'shape' } });
-             fCanvas.add(shapeObj);
-          } else {
-             shapeObj.set(wantOval ? { ...shapeProps, rx: shapeWidth/2, ry: shapeHeight/2 } : shapeProps);
-          }
+          shapeObj.set(obj.boxShape === 'oval' ? { ...sProps, rx: sW/2, ry: sH/2 } : { ...sProps, rx: obj.boxShape === 'rounded' ? 20 : 0, ry: obj.boxShape === 'rounded' ? 20 : 0 });
         }
-      } else {
-        // Remove shape if set to none
-        const existingShape = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'shape');
-        if (existingShape) fCanvas.remove(existingShape);
       }
 
-      // Render Text Object
-      if (!fObj) {
-        fObj = new fabric.Textbox(content, { ...textProps, left: posX, top: posY, data: { id: obj.id, type: 'text' }, lockScalingY: true });
-        fCanvas.add(fObj);
-      } else {
-        if (fObj !== fCanvas.getActiveObject() || !fObj.isEditing) {
-          fObj.set({ ...textProps, left: posX, top: posY });
-        } else {
-          fObj.set({ fontSize: textProps.fontSize, fill: textProps.fill, fontFamily: textProps.fontFamily });
-        }
-      }
-      clampPosition(fObj, obj);
+      // Render Text Box
+      let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
+      const tProps = { width: fWidth, fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, stroke: obj.outlineColor, strokeWidth: obj.outlineWidth, shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) };
+      
+      if (!fObj) { fCanvas.add(new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' }, lockScalingY: true })); }
+      else if (fObj !== fCanvas.getActiveObject() || !fObj.isEditing) { fObj.set({ ...tProps, left: posX, top: posY }); clampPosition(fObj, obj); }
     });
 
     resolveStacking(fCanvas);
-    fCanvas.requestRenderAll();
-    
-    const timer = setTimeout(() => { isRenderingRef.current = false; }, 60);
+    const timer = setTimeout(() => { isRenderingRef.current = false; fCanvas.requestRenderAll(); }, 100);
     return () => clearTimeout(timer);
   }, [page.textObjects, page.masks, containerSize, hideLabels, importMode, resolveStacking, clampPosition]);
 
