@@ -22,17 +22,18 @@ export interface TextStyle {
 export interface TextObject extends TextStyle {
   id: string;
   originalText: string;
-  x: number; 
-  y: number; 
-  width: number; 
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  width: number; // pixels
 }
 
+// Fitur Baru: Mask Object (Kotak Penutup)
 export interface MaskObject {
   id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  width: number; // pixels
+  height: number; // pixels
   fill: string;
 }
 
@@ -47,7 +48,7 @@ export interface Page {
   imageUrl: string;
   fileName: string;
   textObjects: TextObject[];
-  masks?: MaskObject[]; 
+  masks?: MaskObject[]; // Array untuk menyimpan mask
   isLocalStyle?: boolean;
   localStyle?: TextStyle;
   importMode?: ImportMode; // FIX: Property baru untuk menyimpan mode per halaman
@@ -59,7 +60,7 @@ export interface AppState {
   importMode: ImportMode;
   selectedPageId: string | null;
   selectedTextId: string | null;
-  selectedMaskId?: string | null;
+  selectedMaskId?: string | null; // ID mask yang sedang dipilih
   isGalleryView: boolean;
   globalStyle: TextStyle;
   savedStyles: SavedStyle[];

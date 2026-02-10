@@ -37,7 +37,7 @@ const App: React.FC = () => {
   const selectedPage = useMemo(() => state.pages.find(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
   const currentPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
 
-  // FIX: Tentukan Effective Import Mode untuk Editor (Global atau Local)
+  // FIX: Kalkulasi Mode Efektif (Local vs Global) untuk dikirim ke Editor
   const effectiveImportMode = useMemo(() => {
     if (selectedPage?.isLocalStyle && selectedPage.importMode) return selectedPage.importMode;
     return state.importMode;
@@ -61,6 +61,7 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, pages: next }));
   }, [history, state.pages]);
 
+  // FIX: Delete Key untuk Teks DAN Mask
   const deleteSelectedElement = useCallback(() => {
     if (!state.selectedPageId) return;
     if (!state.selectedTextId && !state.selectedMaskId) return;
@@ -79,18 +80,30 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isTyping = ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName);
+      const target = e.target as HTMLElement;
+      const isTyping = ['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable;
+      if (isTyping) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping) { deleteSelectedElement(); }
+      if ((e.key === 'Delete' || e.key === 'Backspace')) { deleteSelectedElement(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, deleteSelectedElement]);
 
+  useEffect(() => {
+    localStorage.setItem('comic-editor-state-v10', JSON.stringify({
+      globalStyle: state.globalStyle,
+      savedStyles: state.savedStyles,
+      hideLabels: state.hideLabels,
+      importMode: state.importMode,
+    }));
+  }, [state.globalStyle, state.savedStyles, state.hideLabels, state.importMode]);
+
   const handleUpload = useCallback((files: File[]) => {
     recordHistory();
-    const newPages: Page[] = [...files].sort((a, b) => a.name.localeCompare(b.name)).map(file => ({
+    const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name));
+    const newPages: Page[] = sortedFiles.map((file) => ({
       id: generateId(), imageUrl: URL.createObjectURL(file), fileName: file.name, textObjects: [], masks: []
     }));
     setState(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
@@ -105,7 +118,7 @@ const App: React.FC = () => {
         const pageNum = index + 1;
         if (parsedData[pageNum]) {
           const style = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
-          // Gunakan mode lokal jika ada, atau global
+          // FIX: Gunakan mode lokal jika ada
           const mode = page.isLocalStyle && page.importMode ? page.importMode : state.importMode;
           const newObjects = parsedData[pageNum].map(txt => createDefaultTextObject(txt, style, mode));
           return { ...page, textObjects: [...page.textObjects, ...newObjects] };
@@ -131,7 +144,6 @@ const App: React.FC = () => {
       if (!page) return prev;
       const style = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
       const mode = page.isLocalStyle && page.importMode ? page.importMode : prev.importMode;
-      
       return {
         ...prev,
         pages: prev.pages.map(p => (p.id === pageId) ? { 
@@ -142,6 +154,7 @@ const App: React.FC = () => {
     });
   }, [recordHistory]);
 
+  // FIX: Handler Add Mask
   const addMaskManually = useCallback((pageId: string) => {
     recordHistory();
     const newMask: MaskObject = { id: generateId(), x: 50, y: 50, width: 200, height: 100, fill: '#FFFFFF' };
@@ -153,6 +166,7 @@ const App: React.FC = () => {
     }));
   }, [recordHistory]);
 
+  // FIX: Handler Update Mask
   const updateMask = useCallback((pageId: string, maskId: string, updates: Partial<MaskObject>) => {
     setState(prev => ({
       ...prev,
@@ -175,7 +189,7 @@ const App: React.FC = () => {
       });
       return { ...prev, globalStyle: isLocal ? prev.globalStyle : newStyle, pages: newPages };
     });
-  }, []);
+  }, [state.importMode]);
 
   const toggleLocalSettings = useCallback((pageId: string) => {
     recordHistory();
@@ -184,21 +198,20 @@ const App: React.FC = () => {
       pages: prev.pages.map(p => (p.id === pageId) ? {
         ...p, 
         isLocalStyle: !p.isLocalStyle, 
-        // FIX: Copy current global style AND import mode when enabling local
+        // FIX: Copy juga importMode saat menyalakan local style
         localStyle: !p.isLocalStyle ? JSON.parse(JSON.stringify(prev.globalStyle)) : undefined,
-        importMode: !p.isLocalStyle ? prev.importMode : undefined 
+        importMode: !p.isLocalStyle ? prev.importMode : undefined
       } : p)
     }));
   }, [recordHistory]);
 
-  // HELPER: Auto-activate local style if undefined
-  const activatePageLocal = (page: Page, globalStyle: TextStyle, globalImportMode: ImportMode): Page => {
+  // Helper untuk Auto Activate Local (FIX Poin 4)
+  const activatePageLocal = (page: Page, globalStyle: TextStyle, globalMode: ImportMode): Page => {
     if (page.isLocalStyle === undefined) {
       return { 
-        ...page, 
-        isLocalStyle: true, 
+        ...page, isLocalStyle: true, 
         localStyle: JSON.parse(JSON.stringify(globalStyle)),
-        importMode: globalImportMode
+        importMode: globalMode 
       };
     }
     return page;
@@ -239,6 +252,7 @@ const App: React.FC = () => {
     }));
   }, []);
 
+  // FIX: Poin 3 (Export Sync)
   const renderToStaticCanvas = async (page: Page) => {
     const tempCanvas = document.createElement('canvas');
     const staticCanvas = new fabric.StaticCanvas(tempCanvas);
@@ -249,9 +263,10 @@ const App: React.FC = () => {
         staticCanvas.setBackgroundImage(img, staticCanvas.renderAll.bind(staticCanvas));
         const scale = oW / previewWidth;
         
-        // FIX: Determine effective mode for export
+        // FIX: Tentukan mode halaman untuk export
         const pageMode = page.isLocalStyle && page.importMode ? page.importMode : state.importMode;
 
+        // Draw Masks
         (page.masks || []).forEach(m => {
           staticCanvas.add(new fabric.Rect({ 
             left: (m.x/100)*oW, top: (m.y/100)*oH, 
@@ -260,6 +275,7 @@ const App: React.FC = () => {
           }));
         });
 
+        // Draw Text with Clamping
         page.textObjects.forEach((obj) => {
           const content = cleanText(obj.originalText, state.hideLabels);
           const fWidth = pageMode === 'full' ? oW - ((obj.paddingLeft + obj.paddingRight + 40)*scale) : obj.width*scale;
@@ -272,7 +288,6 @@ const App: React.FC = () => {
           });
           
           fObj.setCoords();
-          // Export Clamping Logic
           const h = fObj.height;
           const minX = (obj.paddingLeft * scale) + (fWidth / 2);
           const maxX = oW - (obj.paddingRight * scale) - (fWidth / 2);
@@ -293,7 +308,6 @@ const App: React.FC = () => {
     });
   };
 
-  // ... (handleDownloadSinglePage, handleExportZip, clearAllData kept identical)
   const handleDownloadSinglePage = async () => {
     if (!selectedPage) return;
     setIsExporting(true);
@@ -347,9 +361,9 @@ const App: React.FC = () => {
                     <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextId: null }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
                     <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
                     <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-                    <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
+                    <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Next"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
                     <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                    <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
+                    <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
                     <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
