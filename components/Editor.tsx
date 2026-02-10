@@ -33,6 +33,25 @@ const Editor: React.FC<EditorProps> = ({
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
+  // --- FITUR: Jaga teks agar tidak keluar batas bawah ---
+  const clampPosition = useCallback((obj: any, data: TextObject) => {
+    if (!containerSize.height) return;
+    const height = obj.height * obj.scaleY;
+    const halfHeight = height / 2;
+    // Hitung batas aman bawah berdasarkan paddingBottom
+    const maxTop = containerSize.height - (data.paddingBottom || 0) - halfHeight;
+    const minTop = (data.paddingTop || 0) + halfHeight;
+
+    let newTop = obj.top;
+    if (maxTop > minTop) newTop = Math.max(minTop, Math.min(newTop, maxTop));
+    else newTop = (minTop + maxTop) / 2;
+
+    if (newTop !== obj.top) {
+      obj.set({ top: newTop });
+      obj.setCoords();
+    }
+  }, [containerSize]);
+
   // --- 1. SETUP PAPAN TULIS (Hanya sekali saat halaman dibuka) ---
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -64,7 +83,9 @@ const Editor: React.FC<EditorProps> = ({
         const bW = bg ? bg.width * bg.scaleX : 1; 
         const bH = bg ? bg.height * bg.scaleY : 1;
         if (obj.data.type === 'text') {
-          callbacks.current.onUpdateText(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX });
+          const textData = page.textObjects.find(t => t.id === obj.data.id);
+          if (textData) clampPosition(obj, textData);
+          callbacks.current.onUpdateText(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width });
         } else if (obj.data.type === 'mask') {
           callbacks.current.onUpdateMask(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX, height: obj.height*obj.scaleY });
         }
@@ -72,9 +93,9 @@ const Editor: React.FC<EditorProps> = ({
     });
 
     return () => fCanvas.dispose();
-  }, [page.id]);
+  }, [page.id, clampPosition]);
 
-  // --- 2. PASANG GAMBAR BACKGROUND (Fokus Utama) ---
+  // --- 2. PASANG GAMBAR BACKGROUND (Menggunakan Logika Original Berhasil) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || !page.imageUrl || !containerRef.current) return;
@@ -89,10 +110,7 @@ const Editor: React.FC<EditorProps> = ({
         let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
         if (finalHeight > contHeight) { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
         
-        // Ukuran papan tulis harus pas dengan gambar
         fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
-        
-        // Gambar harus memenuhi papan tulis
         img.set({ scaleX: finalWidth/img.width, scaleY: finalHeight/img.height, left: 0, top: 0, selectable: false, evented: false });
         
         fCanvas.setBackgroundImage(img, () => {
@@ -109,7 +127,7 @@ const Editor: React.FC<EditorProps> = ({
     return () => observer.disconnect();
   }, [page.imageUrl]);
 
-  // --- 3. GAMBAR TEKS & MASK (Tetap Ada) ---
+  // --- 3. GAMBAR TEKS & MASK ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
@@ -122,25 +140,45 @@ const Editor: React.FC<EditorProps> = ({
 
     // Gambar Teks
     page.textObjects.forEach((obj) => {
-      const content = cleanText(obj.originalText, hideLabels);
+      // PERBAIKAN: Logika Hide Name Global (Mencari "Nama :" di mana saja)
+      let content = obj.originalText;
+      if (hideLabels) {
+        // Regex ini menghapus "Nama :" di awal kalimat ATAU setelah tanda koma
+        content = content.replace(/(?:\r?\n|^|,\s*)[^:\n,]+:\s*/g, (match) => {
+            return match.startsWith(',') ? ', ' : '';
+        });
+      }
+
       const posX = (obj.x / 100) * containerSize.width;
       const posY = (obj.y / 100) * containerSize.height;
       
+      // PERBAIKAN: Sinkronisasi Lebar Box & Padding (Agar tidak tipis/terpotong)
+      const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
+      // Merubah offset dari -80 menjadi -40 agar sinkron dengan hasil download (tidak terlalu tipis)
+      const baseWidth = importMode === 'full' ? containerSize.width - 40 : obj.width;
+      const textWidth = Math.max(50, baseWidth - horizontalPadding);
+
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
-        width: importMode === 'full' ? containerSize.width - 80 : obj.width,
+        width: textWidth,
         fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
         originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, 
         stroke: obj.outlineColor, strokeWidth: obj.outlineWidth,
-        paintFirst: 'stroke', strokeLineJoin: 'round', // OUTLINE DI LUAR
+        paintFirst: 'stroke', strokeLineJoin: 'round', // OUTLINE TETAP DI LUAR
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
 
-      if (!fObj) fCanvas.add(new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } }));
-      else if (!fObj.isEditing) fObj.set({ ...tProps, left: posX, top: posY });
+      if (!fObj) {
+        const newTxt = new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' }, lockScalingY: true });
+        fCanvas.add(newTxt);
+        clampPosition(newTxt, obj);
+      } else if (!fObj.isEditing) {
+        fObj.set({ ...tProps, left: posX, top: posY });
+        clampPosition(fObj, obj);
+      }
     });
 
-    // Gambar Masker (Warna Penutup)
+    // Gambar Masker
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
       const mProps = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
@@ -155,7 +193,7 @@ const Editor: React.FC<EditorProps> = ({
     });
 
     fCanvas.requestRenderAll();
-  }, [page.textObjects, page.masks, containerSize, hideLabels, importMode]);
+  }, [page.textObjects, page.masks, containerSize, hideLabels, importMode, clampPosition]);
 
   return (
     <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden min-h-[400px]">
