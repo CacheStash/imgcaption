@@ -26,11 +26,36 @@ const Editor: React.FC<EditorProps> = ({
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const isRenderingRef = useRef(false);
 
   const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize });
   useEffect(() => { 
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
+
+  // --- FITUR: REM OTOMATIS (Agar Tidak Nabrak Batas Bawah/Atas) ---
+  const clampPosition = useCallback((obj: any, data: TextObject) => {
+    if (!containerSize.width || !containerSize.height) return;
+    
+    const height = obj.height * obj.scaleY;
+    const halfHeight = height / 2;
+
+    // Batas aman atas dan bawah
+    const minTop = (data.paddingTop || 0) + halfHeight;
+    const maxTop = containerSize.height - (data.paddingBottom || 0) - halfHeight;
+
+    let newTop = obj.top;
+    if (maxTop > minTop) {
+        newTop = Math.max(minTop, Math.min(newTop, maxTop));
+    } else {
+        newTop = (minTop + maxTop) / 2;
+    }
+
+    if (newTop !== obj.top) {
+      obj.set({ top: newTop });
+      obj.setCoords();
+    }
+  }, [containerSize]);
 
   // --- 1. SETUP PAPAN TULIS ---
   useEffect(() => {
@@ -43,24 +68,31 @@ const Editor: React.FC<EditorProps> = ({
     fabricCanvasRef.current = fCanvas;
 
     fCanvas.on('selection:created', (e: any) => {
+      if (isRenderingRef.current) return;
       const obj = e.selected ? e.selected[0] : e.target;
       if (obj?.data?.type === 'text') callbacks.current.onSelectText(obj.data.id);
       else if (obj?.data?.type === 'mask') callbacks.current.onSelectMask(obj.data.id);
     });
 
     fCanvas.on('selection:cleared', () => { 
-      callbacks.current.onSelectText(null); 
-      callbacks.current.onSelectMask(null); 
+      if (!isRenderingRef.current) {
+        callbacks.current.onSelectText(null); 
+        callbacks.current.onSelectMask(null); 
+      }
     });
 
     fCanvas.on('object:modified', (e: any) => {
+      if (isRenderingRef.current) return;
       const obj = e.target;
       if (obj && obj.data?.id) {
         callbacks.current.onRecordHistory();
         const bg = fCanvas.backgroundImage;
         const bW = bg ? bg.width * bg.scaleX : 1; 
         const bH = bg ? bg.height * bg.scaleY : 1;
+        
         if (obj.data.type === 'text') {
+          const textData = page.textObjects.find(t => t.id === obj.data.id);
+          if (textData) clampPosition(obj, textData);
           callbacks.current.onUpdateText(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width });
         } else if (obj.data.type === 'mask') {
           callbacks.current.onUpdateMask(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX, height: obj.height*obj.scaleY });
@@ -69,7 +101,7 @@ const Editor: React.FC<EditorProps> = ({
     });
 
     return () => fCanvas.dispose();
-  }, [page.id]);
+  }, [page.id, clampPosition]);
 
   // --- 2. PASANG GAMBAR BACKGROUND ---
   useEffect(() => {
@@ -103,10 +135,11 @@ const Editor: React.FC<EditorProps> = ({
     return () => observer.disconnect();
   }, [page.imageUrl]);
 
-  // --- 3. GAMBAR TEKS & MASK (DENGAN FIX PADDING & HIDE NAME) ---
+  // --- 3. GAMBAR TEKS & MASK (SINKRON DENGAN DOWNLOAD) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
+    isRenderingRef.current = true;
 
     const ids = [...page.textObjects.map(t => t.id), ...(page.masks || []).map(m => m.id)];
     fCanvas.getObjects().forEach((o: any) => {
@@ -114,11 +147,10 @@ const Editor: React.FC<EditorProps> = ({
     });
 
     page.textObjects.forEach((obj) => {
-      // FIX LOGIKA HIDE NAME: Menghapus semua "Nama :" meskipun ada di tengah kalimat
+      // LOGIKA HIDE NAME (Semua nama karakter hilang)
       let content = obj.originalText;
       if (hideLabels) {
         content = content.replace(/(?:\r?\n|^|,\s*)[^:\n,]+:\s*/g, (match) => {
-           // Jika diawali koma, sisakan komanya saja
            return match.startsWith(',') ? ', ' : '';
         });
       }
@@ -126,10 +158,10 @@ const Editor: React.FC<EditorProps> = ({
       const posX = (obj.x / 100) * containerSize.width;
       const posY = (obj.y / 100) * containerSize.height;
       
-      // FIX PADDING: Lebar tulisan harus dikurangi padding supaya tidak terpotong
-      const totalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
-      const baseWidth = importMode === 'full' ? containerSize.width - 80 : obj.width;
-      const textWidth = Math.max(50, baseWidth - totalPadding);
+      // SINKRONISASI LEBAR: Dibuat sama persis dengan logika download
+      const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
+      const baseWidth = importMode === 'full' ? containerSize.width - 40 : obj.width;
+      const textWidth = Math.max(50, baseWidth - horizontalPadding);
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
@@ -142,9 +174,12 @@ const Editor: React.FC<EditorProps> = ({
       };
 
       if (!fObj) {
-        fCanvas.add(new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } }));
+        const newText = new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } });
+        fCanvas.add(newText);
+        clampPosition(newText, obj);
       } else if (!fObj.isEditing) {
         fObj.set({ ...tProps, left: posX, top: posY });
+        clampPosition(fObj, obj);
       }
     });
 
@@ -155,13 +190,18 @@ const Editor: React.FC<EditorProps> = ({
       else fObj.set(mProps);
     });
 
+    // URUTAN LAPISAN
     fCanvas.getObjects().forEach((obj: any) => { 
       if (obj.data?.type === 'mask') fCanvas.sendToBack(obj);
       if (obj.data?.type === 'text') fCanvas.bringToFront(obj); 
     });
 
-    fCanvas.requestRenderAll();
-  }, [page.textObjects, page.masks, containerSize, hideLabels, importMode]);
+    setTimeout(() => {
+        isRenderingRef.current = false;
+        fCanvas.requestRenderAll();
+    }, 50);
+
+  }, [page.textObjects, page.masks, containerSize, hideLabels, importMode, clampPosition]);
 
   return (
     <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden min-h-[400px]">
