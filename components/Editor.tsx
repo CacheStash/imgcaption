@@ -25,33 +25,39 @@ const Editor: React.FC<EditorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isRenderingRef = useRef(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const isRenderingRef = useRef(false);
 
   const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize });
   useEffect(() => { 
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
-  // --- LOGIKA: REM OTOMATIS (Agar tidak keluar batas bawah) ---
+  // --- FUNGSI: JAGA TEKS TIDAK KELUAR BATAS (BAWAH/SAMPING) ---
   const clampPosition = useCallback((obj: any, data: TextObject) => {
-    if (!containerSize.height) return;
+    if (!containerSize.width || !containerSize.height) return;
+    const width = obj.width * obj.scaleX;
     const height = obj.height * obj.scaleY;
-    const halfHeight = height / 2;
-    const minTop = (data.paddingTop || 0) + halfHeight;
-    const maxTop = containerSize.height - (data.paddingBottom || 0) - halfHeight;
+    
+    // Hitung batas aman
+    const minLeft = (data.paddingLeft || 0) + (width / 2);
+    const maxLeft = containerSize.width - (data.paddingRight || 0) - (width / 2);
+    const minTop = (data.paddingTop || 0) + (height / 2);
+    const maxTop = containerSize.height - (data.paddingBottom || 0) - (height / 2);
 
+    let newLeft = obj.left;
     let newTop = obj.top;
-    if (maxTop > minTop) newTop = Math.max(minTop, Math.min(newTop, maxTop));
-    else newTop = (minTop + maxTop) / 2;
 
-    if (newTop !== obj.top) {
-      obj.set({ top: newTop });
+    if (maxLeft > minLeft) newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+    if (maxTop > minTop) newTop = Math.max(minTop, Math.min(newTop, maxTop));
+
+    if (newLeft !== obj.left || newTop !== obj.top) {
+      obj.set({ left: newLeft, top: newTop });
       obj.setCoords();
     }
   }, [containerSize]);
 
-  // --- 1. SETUP KANVAS ---
+  // --- 1. SETUP AWAL PAPAN TULIS ---
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { 
@@ -83,6 +89,7 @@ const Editor: React.FC<EditorProps> = ({
         const bg = fCanvas.backgroundImage;
         const bW = bg ? bg.width * bg.scaleX : 1; 
         const bH = bg ? bg.height * bg.scaleY : 1;
+        
         if (obj.data.type === 'text') {
           const textData = page.textObjects.find(t => t.id === obj.data.id);
           if (textData) clampPosition(obj, textData);
@@ -93,20 +100,22 @@ const Editor: React.FC<EditorProps> = ({
       }
     });
 
-    return () => fCanvas.dispose();
+    return () => { fCanvas.dispose(); fabricCanvasRef.current = null; };
   }, [page.id, clampPosition]);
 
-  // --- 2. PASANG GAMBAR (BACKGROUND) ---
+  // --- 2. PASANG GAMBAR (BACKGROUND) - PERBAIKAN TOTAL ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || !page.imageUrl || !containerRef.current) return;
 
-    const loadImage = () => {
-      const { width: contWidth, height: contHeight } = containerRef.current!.getBoundingClientRect();
+    const handleResize = () => {
+      if (!containerRef.current) return;
+      const { width: contWidth, height: contHeight } = containerRef.current.getBoundingClientRect();
       if (contWidth === 0) return;
 
       fabric.Image.fromURL(page.imageUrl, (img: any) => {
         if (!img || !fabricCanvasRef.current) return;
+        
         const imgRatio = img.width / img.height; 
         let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
         if (finalHeight > contHeight) { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
@@ -117,31 +126,32 @@ const Editor: React.FC<EditorProps> = ({
         fCanvas.setBackgroundImage(img, () => {
           setContainerSize({ width: finalWidth, height: finalHeight });
           callbacks.current.onResize(finalWidth);
-          fCanvas.renderAll(); 
+          fCanvas.renderAll(); // PAKSA TAMPIL
         });
       }, { crossOrigin: 'anonymous' });
     };
 
-    loadImage();
-    const observer = new ResizeObserver(loadImage);
+    handleResize();
+    const observer = new ResizeObserver(handleResize);
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, [page.imageUrl]);
 
-  // --- 3. GAMBAR TEKS & MASK (SINKRONISASI TOTAL) ---
+  // --- 3. GAMBAR TEKS & MASK (SINKRON DENGAN LOGIKA DOWNLOAD) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
     isRenderingRef.current = true;
 
-    // Bersihkan objek lama
-    const ids = [...page.textObjects.map(t => t.id), ...(page.masks || []).map(m => m.id)];
+    // Bersihkan objek yang sudah dihapus
+    const activeIds = [...page.textObjects.map(t => t.id), ...(page.masks || []).map(m => m.id)];
     fCanvas.getObjects().forEach((o: any) => {
-      if (o.data?.id && !ids.includes(o.data.id)) fCanvas.remove(o);
+      if (o.data?.id && !activeIds.includes(o.data.id)) fCanvas.remove(o);
     });
 
+    // RENDER TEKS
     page.textObjects.forEach((obj) => {
-      // FIX: Logika Hide Name Global (Hapus semua Nama : di mana saja)
+      // FIX LOGIKA HIDE NAME (Hapus semua Nama : di mana saja)
       let content = obj.originalText;
       if (hideLabels) {
         content = content.replace(/(?:\r?\n|^|,\s*)[^:\n,]+:\s*/g, (match) => {
@@ -152,10 +162,10 @@ const Editor: React.FC<EditorProps> = ({
       const posX = (obj.x / 100) * containerSize.width;
       const posY = (obj.y / 100) * containerSize.height;
       
-      // FIX: Sinkronisasi Lebar & Wrapping (Sama dengan logika download)
-      const hPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
+      // FIX SINKRONISASI: Hitung lebar sama persis dengan logika download
+      const paddingH = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
       const baseW = importMode === 'full' ? containerSize.width - 40 : obj.width;
-      const textWidth = Math.max(50, baseW - hPadding);
+      const textWidth = Math.max(50, baseW - paddingH);
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
@@ -163,7 +173,7 @@ const Editor: React.FC<EditorProps> = ({
         fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
         originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, 
         stroke: obj.outlineColor, strokeWidth: obj.outlineWidth,
-        paintFirst: 'stroke', strokeLineJoin: 'round', // Outline di luar
+        paintFirst: 'stroke', strokeLineJoin: 'round', // OUTLINE TETAP DI LUAR
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
 
@@ -177,7 +187,7 @@ const Editor: React.FC<EditorProps> = ({
       }
     });
 
-    // Masker
+    // RENDER MASK
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
       const mProps = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
@@ -185,7 +195,7 @@ const Editor: React.FC<EditorProps> = ({
       else fObj.set(mProps);
     });
 
-    // Lapisan
+    // ATUR TUMPUKAN (Teks paling depan)
     fCanvas.getObjects().forEach((o: any) => { 
       if (o.data?.type === 'mask') fCanvas.sendToBack(o);
       if (o.data?.type === 'text') fCanvas.bringToFront(o); 
@@ -198,7 +208,7 @@ const Editor: React.FC<EditorProps> = ({
   }, [page.textObjects, page.masks, containerSize, hideLabels, importMode, clampPosition]);
 
   return (
-    <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden shadow-2xl min-h-[400px]">
+    <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden min-h-[400px]">
       <canvas ref={canvasRef} />
     </div>
   );
