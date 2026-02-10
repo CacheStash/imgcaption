@@ -27,12 +27,13 @@ const Editor: React.FC<EditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
+  // Simpan fungsi update dalam box rahasia supaya selalu terbaru
   const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize });
   useEffect(() => { 
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
-  // --- 1. SETUP PAPAN TULIS (Logika Original Kamu) ---
+  // --- 1. SETUP PAPAN TULIS (Logika Original Backup) ---
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { 
@@ -61,7 +62,7 @@ const Editor: React.FC<EditorProps> = ({
         const bW = bg ? bg.width * bg.scaleX : 1; 
         const bH = bg ? bg.height * bg.scaleY : 1;
         if (obj.data.type === 'text') {
-          callbacks.current.onUpdateText(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width });
+          callbacks.current.onUpdateText(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX });
         } else if (obj.data.type === 'mask') {
           callbacks.current.onUpdateMask(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX, height: obj.height*obj.scaleY });
         }
@@ -71,7 +72,7 @@ const Editor: React.FC<EditorProps> = ({
     return () => fCanvas.dispose();
   }, [page.id]);
 
-  // --- 2. PASANG GAMBAR BACKGROUND (Logika Original Kamu - Anti Blank) ---
+  // --- 2. PASANG GAMBAR BACKGROUND (Logika Original Backup) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || !page.imageUrl || !containerRef.current) return;
@@ -103,7 +104,7 @@ const Editor: React.FC<EditorProps> = ({
     return () => observer.disconnect();
   }, [page.imageUrl]);
 
-  // --- 3. GAMBAR TEKS & MASK (Update Sesuai Request) ---
+  // --- 3. GAMBAR TEKS & MASK (DENGAN PERBAIKAN) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
@@ -114,22 +115,22 @@ const Editor: React.FC<EditorProps> = ({
     });
 
     page.textObjects.forEach((obj) => {
-      // PERBAIKAN 1: Logika Hide Name Global (Cari semua Nama : di mana saja)
+      // FIX 1: HIDE NAMA GLOBAL (Cari semua Nama : di mana saja)
       let content = obj.originalText;
       if (hideLabels) {
         content = content.replace(/(?:\r?\n|^|,\s*)[^:\n,]+:\s*/g, (match) => {
-            return match.startsWith(',') ? ', ' : '';
+           return match.startsWith(',') ? ', ' : '';
         });
       }
 
       const posX = (obj.x / 100) * containerSize.width;
       const posY = (obj.y / 100) * containerSize.height;
       
-      // PERBAIKAN 2: Sinkronisasi Lebar & Padding (Biar melipat rapi mengikuti setting)
-      const hPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
-      // Merubah -80 menjadi -40 agar kotak lebih lebar (sama dengan download)
-      const baseW = importMode === 'full' ? containerSize.width - 40 : obj.width;
-      const textWidth = Math.max(50, baseW - hPadding);
+      // FIX 2: SINKRONISASI LEBAR & PADDING (Sama dengan Logika Download)
+      // Mengubah -80 menjadi -40 supaya box lebih lebar (tidak ramping/tinggi)
+      const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
+      const baseWidth = importMode === 'full' ? containerSize.width - 40 : obj.width;
+      const textWidth = Math.max(50, baseWidth - horizontalPadding);
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
@@ -141,15 +142,27 @@ const Editor: React.FC<EditorProps> = ({
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
 
-      if (!fObj) fCanvas.add(new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } }));
-      else if (!fObj.isEditing) fObj.set({ ...tProps, left: posX, top: posY });
+      if (!fObj) {
+        const newTxt = new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } });
+        fCanvas.add(newTxt);
+        fObj = newTxt;
+      } else if (!fObj.isEditing) {
+        fObj.set({ ...tProps, left: posX, top: posY });
+      }
 
-      // PERBAIKAN 3: Clamp posisi (Agar teks tidak keluar batas bawah)
-      const currentObj = fObj || fCanvas.getObjects().find((o: any) => o.data?.id === obj.id);
-      if (currentObj) {
-        const halfH = (currentObj.height * currentObj.scaleY) / 2;
+      // FIX 3: ANTI-NABRAK BAWAH (Rem Otomatis)
+      if (fObj) {
+        const halfH = (fObj.height * fObj.scaleY) / 2;
         const maxTop = containerSize.height - (obj.paddingBottom || 0) - halfH;
-        if (currentObj.top > maxTop) currentObj.set({ top: maxTop }).setCoords();
+        const minTop = (obj.paddingTop || 0) + halfH;
+        
+        let safeTop = fObj.top;
+        if (safeTop > maxTop) safeTop = maxTop;
+        if (safeTop < minTop) safeTop = minTop;
+        
+        if (fObj.top !== safeTop) {
+          fObj.set({ top: safeTop }).setCoords();
+        }
       }
     });
 
