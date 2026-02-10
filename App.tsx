@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle, ImportMode } from './types';
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
@@ -74,6 +73,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      // Prevent undo/redo if user is typing in input/textarea
+      const isTyping = ['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable;
+      if (isTyping) return;
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
     };
@@ -110,7 +114,6 @@ const App: React.FC = () => {
         const pageNum = index + 1;
         if (parsedData[pageNum]) {
           const styleToUse = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
-          // PASSING IMPORT MODE HERE
           const newObjects = parsedData[pageNum].map(txt => createDefaultTextObject(txt, styleToUse, state.importMode));
           return { ...page, textObjects: [...page.textObjects, ...newObjects] };
         }
@@ -140,7 +143,6 @@ const App: React.FC = () => {
       pages: prev.pages.map(p => {
         if (p.id !== pageId) return p;
         const styleToUse = p.isLocalStyle && p.localStyle ? p.localStyle : prev.globalStyle;
-        // PASSING IMPORT MODE HERE
         const newObj = createDefaultTextObject("New Dialogue", styleToUse, state.importMode);
         return { ...p, textObjects: [...p.textObjects, newObj] };
       }),
@@ -159,10 +161,24 @@ const App: React.FC = () => {
     }
   }, [recordHistory]);
 
+  // FIX Poin 4: Auto Override Global Setting saat navigasi
   const goToPrevPage = useCallback(() => {
     setState(prev => {
       const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
-      if (idx > 0) return { ...prev, selectedPageId: prev.pages[idx - 1].id, selectedTextId: null };
+      if (idx > 0) {
+        const prevPage = prev.pages[idx - 1];
+        // Jika halaman belum punya status local style (undefined), aktifkan dan copy global style
+        const shouldActivateLocal = prevPage.isLocalStyle === undefined;
+        
+        return { 
+          ...prev, 
+          selectedPageId: prevPage.id, 
+          selectedTextId: null,
+          pages: shouldActivateLocal ? prev.pages.map(p => p.id === prevPage.id ? {
+            ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
+          } : p) : prev.pages
+        };
+      }
       return prev;
     });
   }, []);
@@ -170,8 +186,37 @@ const App: React.FC = () => {
   const goToNextPage = useCallback(() => {
     setState(prev => {
       const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
-      if (idx >= 0 && idx < prev.pages.length - 1) return { ...prev, selectedPageId: prev.pages[idx + 1].id, selectedTextId: null };
+      if (idx >= 0 && idx < prev.pages.length - 1) {
+        const nextPage = prev.pages[idx + 1];
+        // Jika halaman belum punya status local style (undefined), aktifkan dan copy global style
+        const shouldActivateLocal = nextPage.isLocalStyle === undefined;
+
+        return { 
+          ...prev, 
+          selectedPageId: nextPage.id, 
+          selectedTextId: null,
+          pages: shouldActivateLocal ? prev.pages.map(p => p.id === nextPage.id ? {
+            ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
+          } : p) : prev.pages
+        };
+      }
       return prev;
+    });
+  }, []);
+
+  const handleSelectPage = useCallback((id: string) => {
+    setState(prev => {
+      const targetPage = prev.pages.find(p => p.id === id);
+      const shouldActivateLocal = targetPage && targetPage.isLocalStyle === undefined;
+
+      return { 
+        ...prev, 
+        selectedPageId: id, 
+        isGalleryView: false,
+        pages: shouldActivateLocal ? prev.pages.map(p => p.id === id ? {
+          ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
+        } : p) : prev.pages
+      };
     });
   }, []);
 
@@ -203,6 +248,7 @@ const App: React.FC = () => {
     }));
   }, [recordHistory]);
 
+  // FIX Poin 3 & 5: Export Sync & Full Width Logic
   const renderToStaticCanvas = async (page: Page) => {
     const tempCanvas = document.createElement('canvas');
     const staticCanvas = new fabric.StaticCanvas(tempCanvas);
@@ -219,19 +265,15 @@ const App: React.FC = () => {
         page.textObjects.forEach((obj) => {
           const displayContent = cleanText(obj.originalText, state.hideLabels);
           
-          // Apply clamping and offset for export
-          const baseLeft = (obj.x / 100) * originalWidth;
-          const baseTop = (obj.y / 100) * originalHeight;
-          
-          // Fabric padding is used for the selection box, we treat the style padding as a safe zone
-          const safePadding = Math.max(obj.paddingTop, obj.paddingRight, obj.paddingBottom, obj.paddingLeft) * scalingFactor;
+          // Logic Width: Full Width vs Box Mode
+          const finalWidth = state.importMode === 'full' 
+            ? originalWidth - ((obj.paddingLeft + obj.paddingRight + 40) * scalingFactor)
+            : obj.width * scalingFactor;
 
           const fabricObj = new fabric.Textbox(displayContent, {
-            left: baseLeft + ((obj.paddingLeft - obj.paddingRight) * scalingFactor),
-            top: baseTop + ((obj.paddingTop - obj.paddingBottom) * scalingFactor),
-            width: obj.width * scalingFactor,
+            width: finalWidth,
             fontSize: obj.fontSize * scalingFactor,
-            padding: safePadding,
+            padding: 0, 
             fill: obj.color,
             textAlign: 'center',
             originX: 'center',
@@ -243,7 +285,29 @@ const App: React.FC = () => {
             fontFamily: obj.fontFamily || 'Inter',
             shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur * scalingFactor, offsetX: 0, offsetY: 0, opacity: obj.glowOpacity, nonScaling: true })
           });
+
+          // Logic Boundary Clamping (Agar tidak nabrak padding saat export)
+          // Kita perlu kalkulasi posisi aman
+          // Estimasi tinggi (karena textbox fabric height dynamic)
+          // Di sini kita gunakan posisi relatif 0-100 dari state untuk posisi awal
+          const rawLeft = (obj.x / 100) * originalWidth;
+          const rawTop = (obj.y / 100) * originalHeight;
+
+          // Tambahkan ke canvas dulu untuk dapat ukuran dimensi asli
           staticCanvas.add(fabricObj);
+          
+          // Kalkulasi ulang batas aman
+          const objH = fabricObj.height; // Tinggi yang sudah ter-render
+          const minX = (obj.paddingLeft * scalingFactor) + (finalWidth / 2);
+          const maxX = originalWidth - (obj.paddingRight * scalingFactor) - (finalWidth / 2);
+          const minY = (obj.paddingTop * scalingFactor) + (objH / 2);
+          const maxY = originalHeight - (obj.paddingBottom * scalingFactor) - (objH / 2);
+
+          // Terapkan clamping
+          fabricObj.set({
+            left: Math.max(minX, Math.min(maxX, rawLeft)),
+            top: Math.max(minY, Math.min(maxY, rawTop))
+          });
         });
         
         staticCanvas.renderAll();
@@ -299,7 +363,7 @@ const App: React.FC = () => {
         ) : (
           <>
             {state.isGalleryView ? (
-              <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={(id) => setState(prev => ({ ...prev, selectedPageId: id, isGalleryView: false }))} />
+              <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={handleSelectPage} />
             ) : (
               <div className="h-full flex flex-col items-center">
                 <div className="mb-4 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
@@ -314,7 +378,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3"><div className="text-right"><p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p><p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p></div></div>
                 </div>
-                {selectedPage && <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} selectedTextId={state.selectedTextId} onSelectText={handleSelectText} onRecordHistory={recordHistory} onResize={setPreviewWidth} />}
+                {selectedPage && <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={state.importMode} onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} selectedTextId={state.selectedTextId} onSelectText={handleSelectText} onRecordHistory={recordHistory} onResize={setPreviewWidth} />}
               </div>
             )}
           </>
