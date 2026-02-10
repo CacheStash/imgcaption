@@ -26,34 +26,52 @@ export const parseRawText = (text: string, mode: ImportMode = 'box'): Record<num
     let content = (sections[i + 1] || '').trim();
     if (content.toLowerCase().includes('[gak ada dialog]') || content.toLowerCase().includes('[halaman statis]')) continue;
     
-    // Merge dialogues per page to prevent overlapping multiple boxes
-    const mergedContent = content.replace(/,\s*(?=[^:]+:)/g, '\n').trim();
+    // Split into lines first to handle multi-speaker dialogues
+    const lines = content.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     
-    if (mergedContent.length > 0) {
-      result[pageNum] = [mergedContent];
+    if (lines.length > 0) {
+      if (mode === 'box') {
+        // In box mode, we merge all lines into one block per page
+        result[pageNum] = [lines.join('\n')];
+      } else {
+        // In full mode, we might want each line or speaker to have its own centered block
+        // For now, consistent with user expectation, we keep it as one block but style it differently
+        result[pageNum] = [lines.join('\n')];
+      }
     }
   }
   return result;
 };
 
-export const getPosFromAlign = (align: Alignment, vAlign: VerticalAlignment) => {
+export const getPosFromAlign = (align: Alignment, vAlign: VerticalAlignment, mode: ImportMode) => {
+  if (mode === 'full') {
+    return { x: 50, y: 85 }; // Centered at the bottom
+  }
+
   let x = 50;
   let y = 50;
   if (align === 'left') x = 20;
   if (align === 'right') x = 80;
   if (vAlign === 'top') y = 15;
   if (vAlign === 'bottom') y = 85;
+  
   return { x, y };
 };
 
-export const createDefaultTextObject = (content: string, style: TextStyle): TextObject => {
-  const { x, y } = getPosFromAlign(style.alignment, style.verticalAlignment);
+export const createDefaultTextObject = (content: string, style: TextStyle, mode: ImportMode = 'box'): TextObject => {
+  const { x, y } = getPosFromAlign(style.alignment, style.verticalAlignment, mode);
+  
+  // Set width based on mode
+  // Box: traditional bubble width
+  // Full: spans significantly more area for subtitle-style look
+  const width = mode === 'full' ? 700 : 400;
+
   return {
     id: generateId(),
     originalText: content,
     x,
     y,
-    width: 450,
+    width,
     ...style
   };
 };

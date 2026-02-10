@@ -1,4 +1,4 @@
-// types.ts
+
 export type Alignment = 'left' | 'center' | 'right';
 export type VerticalAlignment = 'top' | 'middle' | 'bottom';
 export type ImportMode = 'full' | 'box';
@@ -10,8 +10,8 @@ export interface TextStyle {
   paddingBottom: number;
   paddingLeft: number;
   color: string;
-  alignment: Alignment;
-  verticalAlignment: VerticalAlignment;
+  alignment: Alignment; // Horizontal Position
+  verticalAlignment: VerticalAlignment; // Vertical Position
   outlineColor: string;
   outlineWidth: number;
   glowColor: string;
@@ -23,19 +23,15 @@ export interface TextStyle {
 export interface TextObject extends TextStyle {
   id: string;
   originalText: string;
-  x: number;
-  y: number;
-  width: number;
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  width: number; // pixels
 }
 
-// Fitur Baru: Mask untuk menimpa dialog lama
-export interface MaskObject {
+export interface SavedStyle {
   id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  fill: string;
+  name: string;
+  style: TextStyle;
 }
 
 export interface Page {
@@ -43,7 +39,6 @@ export interface Page {
   imageUrl: string;
   fileName: string;
   textObjects: TextObject[];
-  masks?: MaskObject[]; // Tambahan array mask
   isLocalStyle?: boolean;
   localStyle?: TextStyle;
 }
@@ -54,14 +49,7 @@ export interface AppState {
   importMode: ImportMode;
   selectedPageId: string | null;
   selectedTextId: string | null;
-  selectedMaskId?: string | null; // Track mask yang dipilih
   isGalleryView: boolean;
   globalStyle: TextStyle;
   savedStyles: SavedStyle[];
-}
-
-export interface SavedStyle {
-  id: string;
-  name: string;
-  style: TextStyle;
 }
