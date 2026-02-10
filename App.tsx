@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Page, TextObject, AppState, TextStyle, ImportMode } from './types';
+import { Page, TextObject, AppState, TextStyle, ImportMode, MaskObject } from './types';
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
 import Sidebar from './components/Sidebar';
 import Gallery from './components/Gallery';
@@ -22,14 +22,8 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('comic-editor-state-v10');
     const initial: AppState = {
-      pages: [],
-      hideLabels: false,
-      importMode: 'box',
-      selectedPageId: null,
-      selectedTextId: null,
-      isGalleryView: true,
-      globalStyle: DEFAULT_STYLE,
-      savedStyles: [],
+      pages: [], hideLabels: false, importMode: 'box', selectedPageId: null,
+      selectedTextId: null, selectedMaskId: null, isGalleryView: true, globalStyle: DEFAULT_STYLE, savedStyles: [],
     };
     if (saved) {
       try {
@@ -40,68 +34,64 @@ const App: React.FC = () => {
     return initial;
   });
 
-  const selectedPage = useMemo(() => 
-    state.pages.find(p => p.id === state.selectedPageId),
-  [state.pages, state.selectedPageId]);
+  const selectedPage = useMemo(() => state.pages.find(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
+  const currentPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
 
-  const currentPageIndex = useMemo(() => 
-    state.pages.findIndex(p => p.id === state.selectedPageId),
-  [state.pages, state.selectedPageId]);
+  // FIX: Tentukan Effective Import Mode untuk Editor (Global atau Local)
+  const effectiveImportMode = useMemo(() => {
+    if (selectedPage?.isLocalStyle && selectedPage.importMode) return selectedPage.importMode;
+    return state.importMode;
+  }, [selectedPage, state.importMode]);
 
   const recordHistory = useCallback(() => {
-    setHistory(prev => ({
-      past: [...prev.past, JSON.parse(JSON.stringify(state.pages))],
-      future: []
-    }));
+    setHistory(prev => ({ past: [...prev.past, JSON.parse(JSON.stringify(state.pages))], future: [] }));
   }, [state.pages]);
 
   const undo = useCallback(() => {
     if (history.past.length === 0) return;
     const previous = history.past[history.past.length - 1];
-    const newPast = history.past.slice(0, history.past.length - 1);
-    setHistory({ past: newPast, future: [state.pages, ...history.future] });
+    setHistory(prev => ({ past: prev.past.slice(0, -1), future: [state.pages, ...prev.future] }));
     setState(prev => ({ ...prev, pages: previous }));
   }, [history, state.pages]);
 
   const redo = useCallback(() => {
     if (history.future.length === 0) return;
     const next = history.future[0];
-    const newFuture = history.future.slice(1);
-    setHistory({ past: [...history.past, state.pages], future: newFuture });
+    setHistory(prev => ({ past: [...history.past, state.pages], future: prev.future.slice(1) }));
     setState(prev => ({ ...prev, pages: next }));
   }, [history, state.pages]);
 
+  const deleteSelectedElement = useCallback(() => {
+    if (!state.selectedPageId) return;
+    if (!state.selectedTextId && !state.selectedMaskId) return;
+    recordHistory();
+    setState(prev => ({
+      ...prev,
+      selectedTextId: null,
+      selectedMaskId: null,
+      pages: prev.pages.map(p => (p.id === prev.selectedPageId) ? { 
+          ...p, 
+          textObjects: p.textObjects.filter(t => t.id !== prev.selectedTextId),
+          masks: (p.masks || []).filter(m => m.id !== prev.selectedMaskId)
+        } : p)
+    }));
+  }, [state.selectedPageId, state.selectedTextId, state.selectedMaskId, recordHistory]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      // Prevent undo/redo if user is typing in input/textarea
-      const isTyping = ['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable;
-      if (isTyping) return;
-
+      const isTyping = ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName);
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping) { deleteSelectedElement(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
-
-  useEffect(() => {
-    localStorage.setItem('comic-editor-state-v10', JSON.stringify({
-      globalStyle: state.globalStyle,
-      savedStyles: state.savedStyles,
-      hideLabels: state.hideLabels,
-      importMode: state.importMode,
-    }));
-  }, [state.globalStyle, state.savedStyles, state.hideLabels, state.importMode]);
+  }, [undo, redo, deleteSelectedElement]);
 
   const handleUpload = useCallback((files: File[]) => {
     recordHistory();
-    const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name));
-    const newPages: Page[] = sortedFiles.map((file) => ({
-      id: generateId(),
-      imageUrl: URL.createObjectURL(file),
-      fileName: file.name,
-      textObjects: [],
+    const newPages: Page[] = [...files].sort((a, b) => a.name.localeCompare(b.name)).map(file => ({
+      id: generateId(), imageUrl: URL.createObjectURL(file), fileName: file.name, textObjects: [], masks: []
     }));
     setState(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
   }, [recordHistory]);
@@ -109,74 +99,119 @@ const App: React.FC = () => {
   const handleTextImport = useCallback((rawText: string) => {
     recordHistory();
     const parsedData = parseRawText(rawText, state.importMode);
-    setState(prev => {
-      const updatedPages = prev.pages.map((page, index) => {
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map((page, index) => {
         const pageNum = index + 1;
         if (parsedData[pageNum]) {
-          const styleToUse = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
-          const newObjects = parsedData[pageNum].map(txt => createDefaultTextObject(txt, styleToUse, state.importMode));
+          const style = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
+          // Gunakan mode lokal jika ada, atau global
+          const mode = page.isLocalStyle && page.importMode ? page.importMode : state.importMode;
+          const newObjects = parsedData[pageNum].map(txt => createDefaultTextObject(txt, style, mode));
           return { ...page, textObjects: [...page.textObjects, ...newObjects] };
         }
         return page;
-      });
-      return { ...prev, pages: updatedPages };
-    });
+      })
+    }));
   }, [recordHistory, state.importMode]);
 
   const updatePageText = useCallback((pageId: string, textId: string, updates: Partial<TextObject>) => {
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => {
-        if (p.id !== pageId) return p;
-        return {
-          ...p,
-          textObjects: p.textObjects.map(t => t.id === textId ? { ...t, ...updates } : t)
-        };
-      })
+      pages: prev.pages.map(p => (p.id === pageId) ? {
+        ...p, textObjects: p.textObjects.map(t => t.id === textId ? { ...t, ...updates } : t)
+      } : p)
     }));
   }, []);
 
   const addTextManually = useCallback((pageId: string) => {
     recordHistory();
-    setState(prev => ({
-      ...prev,
-      pages: prev.pages.map(p => {
-        if (p.id !== pageId) return p;
-        const styleToUse = p.isLocalStyle && p.localStyle ? p.localStyle : prev.globalStyle;
-        const newObj = createDefaultTextObject("New Dialogue", styleToUse, state.importMode);
-        return { ...p, textObjects: [...p.textObjects, newObj] };
-      }),
-      selectedTextId: null 
-    }));
-  }, [recordHistory, state.importMode]);
-
-  const handleSelectText = useCallback((id: string | null) => {
-    setState(prev => (prev.selectedTextId === id ? prev : { ...prev, selectedTextId: id }));
-  }, []);
-
-  const clearAllData = useCallback(() => {
-    if (window.confirm("Delete everything?")) {
-      recordHistory();
-      setState(prev => ({ ...prev, pages: [], selectedPageId: null, isGalleryView: true }));
-    }
+    setState(prev => {
+      const page = prev.pages.find(p => p.id === pageId);
+      if (!page) return prev;
+      const style = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
+      const mode = page.isLocalStyle && page.importMode ? page.importMode : prev.importMode;
+      
+      return {
+        ...prev,
+        pages: prev.pages.map(p => (p.id === pageId) ? { 
+          ...p, textObjects: [...p.textObjects, createDefaultTextObject("New Dialogue", style, mode)] 
+        } : p),
+        selectedTextId: null 
+      };
+    });
   }, [recordHistory]);
 
-  // FIX Poin 4: Auto Override Global Setting saat navigasi
+  const addMaskManually = useCallback((pageId: string) => {
+    recordHistory();
+    const newMask: MaskObject = { id: generateId(), x: 50, y: 50, width: 200, height: 100, fill: '#FFFFFF' };
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), newMask] } : p),
+      selectedTextId: null,
+      selectedMaskId: newMask.id
+    }));
+  }, [recordHistory]);
+
+  const updateMask = useCallback((pageId: string, maskId: string, updates: Partial<MaskObject>) => {
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === pageId ? {
+        ...p, masks: (p.masks || []).map(m => m.id === maskId ? { ...m, ...updates } : m)
+      } : p)
+    }));
+  }, []);
+
+  const updateGlobalStyle = useCallback((newStyle: TextStyle) => {
+    const { x, y } = getPosFromAlign(newStyle.alignment, newStyle.verticalAlignment, state.importMode);
+    setState(prev => {
+      const isLocal = prev.selectedPageId && prev.pages.find(p => p.id === prev.selectedPageId)?.isLocalStyle;
+      const newPages = prev.pages.map(page => {
+        if (isLocal && page.id === prev.selectedPageId) {
+          return { ...page, localStyle: newStyle, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
+        }
+        if (page.isLocalStyle) return page;
+        return { ...page, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
+      });
+      return { ...prev, globalStyle: isLocal ? prev.globalStyle : newStyle, pages: newPages };
+    });
+  }, []);
+
+  const toggleLocalSettings = useCallback((pageId: string) => {
+    recordHistory();
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => (p.id === pageId) ? {
+        ...p, 
+        isLocalStyle: !p.isLocalStyle, 
+        // FIX: Copy current global style AND import mode when enabling local
+        localStyle: !p.isLocalStyle ? JSON.parse(JSON.stringify(prev.globalStyle)) : undefined,
+        importMode: !p.isLocalStyle ? prev.importMode : undefined 
+      } : p)
+    }));
+  }, [recordHistory]);
+
+  // HELPER: Auto-activate local style if undefined
+  const activatePageLocal = (page: Page, globalStyle: TextStyle, globalImportMode: ImportMode): Page => {
+    if (page.isLocalStyle === undefined) {
+      return { 
+        ...page, 
+        isLocalStyle: true, 
+        localStyle: JSON.parse(JSON.stringify(globalStyle)),
+        importMode: globalImportMode
+      };
+    }
+    return page;
+  };
+
   const goToPrevPage = useCallback(() => {
     setState(prev => {
       const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
       if (idx > 0) {
-        const prevPage = prev.pages[idx - 1];
-        // Jika halaman belum punya status local style (undefined), aktifkan dan copy global style
-        const shouldActivateLocal = prevPage.isLocalStyle === undefined;
-        
+        const target = prev.pages[idx - 1];
         return { 
-          ...prev, 
-          selectedPageId: prevPage.id, 
-          selectedTextId: null,
-          pages: shouldActivateLocal ? prev.pages.map(p => p.id === prevPage.id ? {
-            ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
-          } : p) : prev.pages
+          ...prev, selectedPageId: target.id, selectedTextId: null, 
+          pages: prev.pages.map(p => p.id === target.id ? activatePageLocal(p, prev.globalStyle, prev.importMode) : p) 
         };
       }
       return prev;
@@ -187,17 +222,10 @@ const App: React.FC = () => {
     setState(prev => {
       const idx = prev.pages.findIndex(p => p.id === prev.selectedPageId);
       if (idx >= 0 && idx < prev.pages.length - 1) {
-        const nextPage = prev.pages[idx + 1];
-        // Jika halaman belum punya status local style (undefined), aktifkan dan copy global style
-        const shouldActivateLocal = nextPage.isLocalStyle === undefined;
-
+        const target = prev.pages[idx + 1];
         return { 
-          ...prev, 
-          selectedPageId: nextPage.id, 
-          selectedTextId: null,
-          pages: shouldActivateLocal ? prev.pages.map(p => p.id === nextPage.id ? {
-            ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
-          } : p) : prev.pages
+          ...prev, selectedPageId: target.id, selectedTextId: null, 
+          pages: prev.pages.map(p => p.id === target.id ? activatePageLocal(p, prev.globalStyle, prev.importMode) : p) 
         };
       }
       return prev;
@@ -205,128 +233,74 @@ const App: React.FC = () => {
   }, []);
 
   const handleSelectPage = useCallback((id: string) => {
-    setState(prev => {
-      const targetPage = prev.pages.find(p => p.id === id);
-      const shouldActivateLocal = targetPage && targetPage.isLocalStyle === undefined;
-
-      return { 
-        ...prev, 
-        selectedPageId: id, 
-        isGalleryView: false,
-        pages: shouldActivateLocal ? prev.pages.map(p => p.id === id ? {
-          ...p, isLocalStyle: true, localStyle: JSON.parse(JSON.stringify(prev.globalStyle))
-        } : p) : prev.pages
-      };
-    });
+    setState(prev => ({ 
+      ...prev, selectedPageId: id, isGalleryView: false, 
+      pages: prev.pages.map(p => p.id === id ? activatePageLocal(p, prev.globalStyle, prev.importMode) : p) 
+    }));
   }, []);
 
-  const updateGlobalStyle = useCallback((newStyle: TextStyle) => {
-    const { x, y } = getPosFromAlign(newStyle.alignment, newStyle.verticalAlignment, state.importMode);
-    setState(prev => {
-      const isLocalActive = prev.selectedPageId && prev.pages.find(p => p.id === prev.selectedPageId)?.isLocalStyle;
-      const newPages = prev.pages.map(page => {
-        if (isLocalActive) {
-          if (page.id !== prev.selectedPageId) return page;
-          return { ...page, localStyle: newStyle, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
-        }
-        if (page.isLocalStyle) return page;
-        return { ...page, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
-      });
-      return { ...prev, globalStyle: isLocalActive ? prev.globalStyle : newStyle, pages: newPages };
-    });
-  }, [state.importMode]);
-
-  const toggleLocalSettings = useCallback((pageId: string) => {
-    recordHistory();
-    setState(prev => ({
-      ...prev,
-      pages: prev.pages.map(p => {
-        if (p.id !== pageId) return p;
-        const status = !p.isLocalStyle;
-        return { ...p, isLocalStyle: status, localStyle: status ? JSON.parse(JSON.stringify(prev.globalStyle)) : undefined };
-      })
-    }));
-  }, [recordHistory]);
-
-  // FIX Poin 3 & 5: Export Sync & Full Width Logic
   const renderToStaticCanvas = async (page: Page) => {
     const tempCanvas = document.createElement('canvas');
     const staticCanvas = new fabric.StaticCanvas(tempCanvas);
-    
     return new Promise<string>((resolve) => {
       fabric.Image.fromURL(page.imageUrl, (img: any) => {
-        const originalWidth = img.width;
-        const originalHeight = img.height;
-        staticCanvas.setDimensions({ width: originalWidth, height: originalHeight });
+        const oW = img.width; const oH = img.height;
+        staticCanvas.setDimensions({ width: oW, height: oH });
         staticCanvas.setBackgroundImage(img, staticCanvas.renderAll.bind(staticCanvas));
+        const scale = oW / previewWidth;
         
-        const scalingFactor = originalWidth / previewWidth;
+        // FIX: Determine effective mode for export
+        const pageMode = page.isLocalStyle && page.importMode ? page.importMode : state.importMode;
+
+        (page.masks || []).forEach(m => {
+          staticCanvas.add(new fabric.Rect({ 
+            left: (m.x/100)*oW, top: (m.y/100)*oH, 
+            width: m.width*scale, height: m.height*scale, 
+            fill: m.fill, originX: 'center', originY: 'center' 
+          }));
+        });
 
         page.textObjects.forEach((obj) => {
-          const displayContent = cleanText(obj.originalText, state.hideLabels);
-          
-          // Logic Width: Full Width vs Box Mode
-          const finalWidth = state.importMode === 'full' 
-            ? originalWidth - ((obj.paddingLeft + obj.paddingRight + 40) * scalingFactor)
-            : obj.width * scalingFactor;
-
-          const fabricObj = new fabric.Textbox(displayContent, {
-            width: finalWidth,
-            fontSize: obj.fontSize * scalingFactor,
-            padding: 0, 
-            fill: obj.color,
-            textAlign: 'center',
-            originX: 'center',
-            originY: 'center',
-            stroke: obj.outlineColor,
-            strokeWidth: obj.outlineWidth * scalingFactor,
-            strokeUniform: true,
-            paintFirst: 'stroke',
-            fontFamily: obj.fontFamily || 'Inter',
-            shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur * scalingFactor, offsetX: 0, offsetY: 0, opacity: obj.glowOpacity, nonScaling: true })
+          const content = cleanText(obj.originalText, state.hideLabels);
+          const fWidth = pageMode === 'full' ? oW - ((obj.paddingLeft + obj.paddingRight + 40)*scale) : obj.width*scale;
+          const fObj = new fabric.Textbox(content, { 
+            width: fWidth, fontSize: obj.fontSize*scale, fill: obj.color, 
+            textAlign: 'center', originX: 'center', originY: 'center', 
+            stroke: obj.outlineColor, strokeWidth: obj.outlineWidth*scale, 
+            fontFamily: obj.fontFamily || 'Inter', strokeUniform: true, paintFirst: 'stroke', 
+            shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur*scale, opacity: obj.glowOpacity }) 
           });
-
-          // Logic Boundary Clamping (Agar tidak nabrak padding saat export)
-          // Kita perlu kalkulasi posisi aman
-          // Estimasi tinggi (karena textbox fabric height dynamic)
-          // Di sini kita gunakan posisi relatif 0-100 dari state untuk posisi awal
-          const rawLeft = (obj.x / 100) * originalWidth;
-          const rawTop = (obj.y / 100) * originalHeight;
-
-          // Tambahkan ke canvas dulu untuk dapat ukuran dimensi asli
-          staticCanvas.add(fabricObj);
           
-          // Kalkulasi ulang batas aman
-          const objH = fabricObj.height; // Tinggi yang sudah ter-render
-          const minX = (obj.paddingLeft * scalingFactor) + (finalWidth / 2);
-          const maxX = originalWidth - (obj.paddingRight * scalingFactor) - (finalWidth / 2);
-          const minY = (obj.paddingTop * scalingFactor) + (objH / 2);
-          const maxY = originalHeight - (obj.paddingBottom * scalingFactor) - (objH / 2);
-
-          // Terapkan clamping
-          fabricObj.set({
-            left: Math.max(minX, Math.min(maxX, rawLeft)),
-            top: Math.max(minY, Math.min(maxY, rawTop))
+          fObj.setCoords();
+          // Export Clamping Logic
+          const h = fObj.height;
+          const minX = (obj.paddingLeft * scale) + (fWidth / 2);
+          const maxX = oW - (obj.paddingRight * scale) - (fWidth / 2);
+          const minY = (obj.paddingTop * scale) + (h / 2);
+          const maxY = oH - (obj.paddingBottom * scale) - (h / 2);
+          
+          fObj.set({ 
+            left: Math.max(minX, Math.min(maxX, (obj.x/100)*oW)), 
+            top: Math.max(minY, Math.min(maxY, (obj.y/100)*oH)) 
           });
+          staticCanvas.add(fObj);
         });
         
         staticCanvas.renderAll();
-        const dataUrl = staticCanvas.toDataURL({ format: 'jpeg', quality: 0.85 });
+        resolve(staticCanvas.toDataURL({ format: 'jpeg', quality: 0.85 }));
         staticCanvas.dispose();
-        resolve(dataUrl);
       });
     });
   };
 
+  // ... (handleDownloadSinglePage, handleExportZip, clearAllData kept identical)
   const handleDownloadSinglePage = async () => {
     if (!selectedPage) return;
     setIsExporting(true);
     try {
       const dataUrl = await renderToStaticCanvas(selectedPage);
       const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `page_${currentPageIndex + 1}_${selectedPage.fileName.split('.')[0]}.jpg`;
-      link.click();
+      link.href = dataUrl; link.download = `page_${currentPageIndex + 1}_${selectedPage.fileName.split('.')[0]}.jpg`; link.click();
     } catch (e) { alert("Download failed"); } finally { setIsExporting(false); }
   };
 
@@ -342,17 +316,19 @@ const App: React.FC = () => {
       }
       const content = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(content);
-      link.download = `comic_export_${new Date().getTime()}.zip`;
-      link.click();
+      link.href = URL.createObjectURL(content); link.download = `comic_export.zip`; link.click();
     } catch (e) { alert("ZIP Export failed"); } finally { setIsExporting(false); }
   };
+
+  const clearAllData = useCallback(() => {
+    if (window.confirm("Delete everything?")) { recordHistory(); setState(prev => ({ ...prev, pages: [], selectedPageId: null, isGalleryView: true })); }
+  }, [recordHistory]);
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
       <Sidebar 
         state={state} setState={setState} onTextImport={handleTextImport}
-        onUpdateText={updatePageText} onAddText={addTextManually}
+        onUpdateText={updatePageText} onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask}
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
@@ -370,15 +346,33 @@ const App: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextId: null }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
                     <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                    <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Prev"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-                    <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Next"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
+                    <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+                    <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
                     <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                    <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
-                    <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Redo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" /></svg></button>
+                    <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
+                    <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+                      </svg>
+                    </button>
                   </div>
-                  <div className="flex items-center gap-3"><div className="text-right"><p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p><p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p></div></div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p>
+                      <p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p>
+                    </div>
+                  </div>
                 </div>
-                {selectedPage && <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={state.importMode} onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} selectedTextId={state.selectedTextId} onSelectText={handleSelectText} onRecordHistory={recordHistory} onResize={setPreviewWidth} />}
+                {selectedPage && (
+                  <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={effectiveImportMode} 
+                    onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} 
+                    onUpdateMask={(id, upd) => updateMask(selectedPage.id, id, upd)}
+                    selectedTextId={state.selectedTextId} selectedMaskId={state.selectedMaskId}
+                    onSelectText={id => setState(p => ({ ...p, selectedTextId: id, selectedMaskId: null }))}
+                    onSelectMask={id => setState(p => ({ ...p, selectedMaskId: id, selectedTextId: null }))}
+                    onRecordHistory={recordHistory} onResize={setPreviewWidth} 
+                  />
+                )}
               </div>
             )}
           </>
