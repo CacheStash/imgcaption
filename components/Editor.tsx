@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Page, TextObject, ImportMode, MaskObject } from '../types';
 import { cleanText } from '../utils/helpers';
 
-// DEFINISI INTERFACE (Memperbaiki error 'Cannot find name EditorProps')
 interface EditorProps {
   page: Page;
   hideLabels: boolean;
@@ -34,24 +33,12 @@ const Editor: React.FC<EditorProps> = ({
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
-  // 1. Logic Resolve Stacking (Memperbaiki error 'Cannot find name resolveStacking')
-  const resolveStacking = useCallback((fCanvas: any) => {
-    if (!fCanvas) return;
-    const objs = fCanvas.getObjects();
-    objs.forEach((obj: any) => { 
-      if (obj.data?.type === 'mask') fCanvas.sendToBack(obj);
-      if (obj.data?.type === 'shape') fCanvas.moveTo(obj, objs.length > 2 ? 1 : 0);
-      if (obj.data?.type === 'text') fCanvas.bringToFront(obj); 
-    });
-    fCanvas.requestRenderAll();
-  }, []);
-
-  // 2. Logic Clamp Position (Agar teks tidak bablas keluar padding)
   const clampPosition = useCallback((obj: any, data: TextObject) => {
     if (!containerSize.width || !containerSize.height) return;
-    
-    const halfWidth = (obj.width * obj.scaleX) / 2;
-    const halfHeight = (obj.height * obj.scaleY) / 2;
+    const width = obj.width * obj.scaleX;
+    const height = obj.height * obj.scaleY;
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
 
     const minLeft = data.paddingLeft + halfWidth;
     const maxLeft = containerSize.width - data.paddingRight - halfWidth;
@@ -73,7 +60,16 @@ const Editor: React.FC<EditorProps> = ({
     }
   }, [containerSize]);
 
-  // 3. Inisialisasi Canvas
+  const resolveStacking = useCallback((fCanvas: any) => {
+    const objs = fCanvas.getObjects();
+    objs.forEach((obj: any) => { 
+      if (obj.data?.type === 'mask') fCanvas.sendToBack(obj);
+      if (obj.data?.type === 'shape') fCanvas.moveTo(obj, objs.length > 2 ? 1 : 0);
+      if (obj.data?.type === 'text') fCanvas.bringToFront(obj); 
+    });
+    fCanvas.requestRenderAll();
+  }, []);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { 
@@ -83,7 +79,15 @@ const Editor: React.FC<EditorProps> = ({
     });
     fabricCanvasRef.current = fCanvas;
 
-    // Event handlers (selection, modified, etc)
+    fCanvas.on('selection:created', (e: any) => {
+      if (isRenderingRef.current) return;
+      const obj = e.selected ? e.selected[0] : e.target;
+      if (obj?.data?.type === 'text') { callbacks.current.onSelectText(obj.data.id); callbacks.current.onSelectMask(null); }
+      else if (obj?.data?.type === 'mask') { callbacks.current.onSelectMask(obj.data.id); callbacks.current.onSelectText(null); }
+    });
+
+    fCanvas.on('selection:cleared', () => { if (!isRenderingRef.current) { callbacks.current.onSelectText(null); callbacks.current.onSelectMask(null); } });
+
     fCanvas.on('object:modified', (e: any) => {
       if (isRenderingRef.current) return;
       const obj = e.target;
@@ -97,7 +101,16 @@ const Editor: React.FC<EditorProps> = ({
           const textData = page.textObjects.find(t => t.id === obj.data.id);
           if (textData) clampPosition(obj, textData);
           callbacks.current.onUpdateText(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX });
+        } else if (obj.data.type === 'mask') {
+          callbacks.current.onUpdateMask(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX, height: obj.height*obj.scaleY });
         }
+        resolveStacking(fCanvas);
+      }
+    });
+
+    fCanvas.on('text:changed', (e: any) => {
+      if (!isRenderingRef.current && e.target?.data?.type === 'text') {
+        callbacks.current.onUpdateText(e.target.data.id, { originalText: e.target.text });
         resolveStacking(fCanvas);
       }
     });
@@ -105,7 +118,6 @@ const Editor: React.FC<EditorProps> = ({
     return () => { fCanvas.dispose(); fabricCanvasRef.current = null; };
   }, [page.id, resolveStacking, clampPosition]);
 
-  // 4. Anti-Flicker Image Loading
   const syncCanvasSize = useCallback(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!containerRef.current || !fCanvas) return;
@@ -138,39 +150,37 @@ const Editor: React.FC<EditorProps> = ({
     return () => observer.disconnect();
   }, [syncCanvasSize]);
 
-  // 5. Main Render Loop (Wrapping & Padding Fix)
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
     isRenderingRef.current = true;
     
-    // Cleanup removed objects logic... (tetap sama)
     const textIds = page.textObjects.map(t => t.id);
+    const maskIds = (page.masks || []).map(m => m.id);
     fCanvas.getObjects().forEach((obj: any) => {
-      if (obj.data?.id && obj.data.type === 'text' && !textIds.includes(obj.data.id)) {
+      if (obj.data?.id && ((obj.data.type === 'text' && !textIds.includes(obj.data.id)) || (obj.data.type === 'mask' && !maskIds.includes(obj.data.id)) || (obj.data.type === 'shape' && !textIds.includes(obj.data.id)))) {
         fCanvas.remove(obj);
       }
     });
 
+    (page.masks || []).forEach((mask) => {
+      let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
+      const props = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
+      if (!fObj) { fCanvas.add(new fabric.Rect({ ...props, data: { id: mask.id, type: 'mask' } })); } 
+      else if (fObj !== fCanvas.getActiveObject()) { fObj.set(props); }
+    });
+
     page.textObjects.forEach((obj) => {
       const content = cleanText(obj.originalText, hideLabels);
-      
-      // FIX: Hitung Max Width dikurangi padding kiri & kanan
-      const maxAllowedWidth = containerSize.width - (obj.paddingLeft + obj.paddingRight);
-      const fWidth = importMode === 'full' ? maxAllowedWidth : Math.min(obj.width || 200, maxAllowedWidth);
-      
       const posX = (obj.x / 100) * containerSize.width;
       const posY = (obj.y / 100) * containerSize.height;
+      const fWidth = importMode === 'full' ? containerSize.width - (obj.paddingLeft + obj.paddingRight + 40) : obj.width;
 
-      // Render Shape (Background Box)
       if (obj.boxShape && obj.boxShape !== 'none') {
         let shapeObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'shape');
         let textObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
-        
-        const currentH = textObj ? textObj.height * textObj.scaleY : obj.fontSize * 1.5;
-        const currentW = textObj ? textObj.width * textObj.scaleX : fWidth;
-        
-        const sW = currentW + (obj.paddingLeft + obj.paddingRight);
+        const currentH = textObj ? textObj.height * textObj.scaleY : obj.fontSize * 2;
+        const sW = fWidth + (obj.paddingLeft + obj.paddingRight);
         const sH = currentH + (obj.paddingTop + obj.paddingBottom);
         const sProps = { left: posX, top: posY, width: sW, height: sH, fill: obj.backgroundColor || '#ffffff', originX: 'center', originY: 'center', selectable: false, evented: false };
 
@@ -183,10 +193,10 @@ const Editor: React.FC<EditorProps> = ({
         }
       }
 
-      // Render Text dengan Wrapping Otomatis
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
+      
       const tProps = { 
-        width: fWidth, // Ini mengunci text agar tidak keluar padding
+        width: fWidth, 
         fontSize: obj.fontSize, 
         fill: obj.color, 
         textAlign: 'center', 
@@ -196,13 +206,16 @@ const Editor: React.FC<EditorProps> = ({
         text: content, 
         stroke: obj.outlineColor, 
         strokeWidth: obj.outlineWidth,
-        paintFirst: 'stroke',
-        splitByGrapheme: true // Menjaga wrapping tetap rapi
+        paintFirst: 'stroke', // Ini rahasia supaya garisnya di luar
+        strokeLineJoin: 'round',
+        strokeUniform: true,
+        shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
       
       if (!fObj) { 
         fCanvas.add(new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' }, lockScalingY: true })); 
-      } else if (fObj !== fCanvas.getActiveObject() || !fObj.isEditing) { 
+      }
+      else if (fObj !== fCanvas.getActiveObject() || !fObj.isEditing) { 
         fObj.set({ ...tProps, left: posX, top: posY }); 
         clampPosition(fObj, obj); 
       }
@@ -211,7 +224,7 @@ const Editor: React.FC<EditorProps> = ({
     resolveStacking(fCanvas);
     const timer = setTimeout(() => { isRenderingRef.current = false; fCanvas.requestRenderAll(); }, 100);
     return () => clearTimeout(timer);
-  }, [page.textObjects, containerSize, hideLabels, importMode, resolveStacking, clampPosition]);
+  }, [page.textObjects, page.masks, containerSize, hideLabels, importMode, resolveStacking, clampPosition]);
 
   return (
     <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden shadow-inner border border-slate-800 min-h-[400px]">
