@@ -25,31 +25,25 @@ const Editor: React.FC<EditorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const isRenderingRef = useRef(false);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize });
   useEffect(() => { 
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
-  // --- FITUR: REM OTOMATIS (Agar Tidak Nabrak Batas Bawah/Atas) ---
+  // --- LOGIKA: REM OTOMATIS (Agar tidak keluar batas bawah) ---
   const clampPosition = useCallback((obj: any, data: TextObject) => {
-    if (!containerSize.width || !containerSize.height) return;
-    
+    if (!containerSize.height) return;
     const height = obj.height * obj.scaleY;
     const halfHeight = height / 2;
-
-    // Batas aman atas dan bawah
     const minTop = (data.paddingTop || 0) + halfHeight;
     const maxTop = containerSize.height - (data.paddingBottom || 0) - halfHeight;
 
     let newTop = obj.top;
-    if (maxTop > minTop) {
-        newTop = Math.max(minTop, Math.min(newTop, maxTop));
-    } else {
-        newTop = (minTop + maxTop) / 2;
-    }
+    if (maxTop > minTop) newTop = Math.max(minTop, Math.min(newTop, maxTop));
+    else newTop = (minTop + maxTop) / 2;
 
     if (newTop !== obj.top) {
       obj.set({ top: newTop });
@@ -57,7 +51,7 @@ const Editor: React.FC<EditorProps> = ({
     }
   }, [containerSize]);
 
-  // --- 1. SETUP PAPAN TULIS ---
+  // --- 1. SETUP KANVAS ---
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { 
@@ -89,7 +83,6 @@ const Editor: React.FC<EditorProps> = ({
         const bg = fCanvas.backgroundImage;
         const bW = bg ? bg.width * bg.scaleX : 1; 
         const bH = bg ? bg.height * bg.scaleY : 1;
-        
         if (obj.data.type === 'text') {
           const textData = page.textObjects.find(t => t.id === obj.data.id);
           if (textData) clampPosition(obj, textData);
@@ -103,7 +96,7 @@ const Editor: React.FC<EditorProps> = ({
     return () => fCanvas.dispose();
   }, [page.id, clampPosition]);
 
-  // --- 2. PASANG GAMBAR BACKGROUND ---
+  // --- 2. PASANG GAMBAR (BACKGROUND) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || !page.imageUrl || !containerRef.current) return;
@@ -113,7 +106,7 @@ const Editor: React.FC<EditorProps> = ({
       if (contWidth === 0) return;
 
       fabric.Image.fromURL(page.imageUrl, (img: any) => {
-        if (!img) return;
+        if (!img || !fabricCanvasRef.current) return;
         const imgRatio = img.width / img.height; 
         let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
         if (finalHeight > contHeight) { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
@@ -135,19 +128,20 @@ const Editor: React.FC<EditorProps> = ({
     return () => observer.disconnect();
   }, [page.imageUrl]);
 
-  // --- 3. GAMBAR TEKS & MASK (SINKRON DENGAN DOWNLOAD) ---
+  // --- 3. GAMBAR TEKS & MASK (SINKRONISASI TOTAL) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
     isRenderingRef.current = true;
 
+    // Bersihkan objek lama
     const ids = [...page.textObjects.map(t => t.id), ...(page.masks || []).map(m => m.id)];
     fCanvas.getObjects().forEach((o: any) => {
       if (o.data?.id && !ids.includes(o.data.id)) fCanvas.remove(o);
     });
 
     page.textObjects.forEach((obj) => {
-      // LOGIKA HIDE NAME (Semua nama karakter hilang)
+      // FIX: Logika Hide Name Global (Hapus semua Nama : di mana saja)
       let content = obj.originalText;
       if (hideLabels) {
         content = content.replace(/(?:\r?\n|^|,\s*)[^:\n,]+:\s*/g, (match) => {
@@ -158,10 +152,10 @@ const Editor: React.FC<EditorProps> = ({
       const posX = (obj.x / 100) * containerSize.width;
       const posY = (obj.y / 100) * containerSize.height;
       
-      // SINKRONISASI LEBAR: Dibuat sama persis dengan logika download
-      const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
-      const baseWidth = importMode === 'full' ? containerSize.width - 40 : obj.width;
-      const textWidth = Math.max(50, baseWidth - horizontalPadding);
+      // FIX: Sinkronisasi Lebar & Wrapping (Sama dengan logika download)
+      const hPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
+      const baseW = importMode === 'full' ? containerSize.width - 40 : obj.width;
+      const textWidth = Math.max(50, baseW - hPadding);
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
@@ -169,20 +163,21 @@ const Editor: React.FC<EditorProps> = ({
         fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
         originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, 
         stroke: obj.outlineColor, strokeWidth: obj.outlineWidth,
-        paintFirst: 'stroke', strokeLineJoin: 'round',
+        paintFirst: 'stroke', strokeLineJoin: 'round', // Outline di luar
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
 
       if (!fObj) {
-        const newText = new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } });
-        fCanvas.add(newText);
-        clampPosition(newText, obj);
+        const newTxt = new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } });
+        fCanvas.add(newTxt);
+        clampPosition(newTxt, obj);
       } else if (!fObj.isEditing) {
         fObj.set({ ...tProps, left: posX, top: posY });
         clampPosition(fObj, obj);
       }
     });
 
+    // Masker
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
       const mProps = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
@@ -190,21 +185,20 @@ const Editor: React.FC<EditorProps> = ({
       else fObj.set(mProps);
     });
 
-    // URUTAN LAPISAN
-    fCanvas.getObjects().forEach((obj: any) => { 
-      if (obj.data?.type === 'mask') fCanvas.sendToBack(obj);
-      if (obj.data?.type === 'text') fCanvas.bringToFront(obj); 
+    // Lapisan
+    fCanvas.getObjects().forEach((o: any) => { 
+      if (o.data?.type === 'mask') fCanvas.sendToBack(o);
+      if (o.data?.type === 'text') fCanvas.bringToFront(o); 
     });
 
     setTimeout(() => {
-        isRenderingRef.current = false;
-        fCanvas.requestRenderAll();
+      isRenderingRef.current = false;
+      fCanvas.requestRenderAll();
     }, 50);
-
   }, [page.textObjects, page.masks, containerSize, hideLabels, importMode, clampPosition]);
 
   return (
-    <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden min-h-[400px]">
+    <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden shadow-2xl min-h-[400px]">
       <canvas ref={canvasRef} />
     </div>
   );
