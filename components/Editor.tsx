@@ -27,13 +27,14 @@ const Editor: React.FC<EditorProps> = ({
   const isRenderingRef = useRef(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const currentImgUrlRef = useRef<string>("");
 
   const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize });
   useEffect(() => { 
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
-  // --- FITUR TETAP: Menjaga posisi teks agar tidak keluar batas ---
+  // Fungsi untuk menjaga teks tidak keluar dari kertas
   const clampPosition = useCallback((obj: any, data: TextObject) => {
     if (!containerSize.width || !containerSize.height) return;
     const width = obj.width * obj.scaleX;
@@ -61,7 +62,7 @@ const Editor: React.FC<EditorProps> = ({
     }
   }, [containerSize]);
 
-  // --- FITUR TETAP: Mengatur tumpukan (Mask di bawah, Text di atas) ---
+  // Fungsi untuk mengatur urutan (Mask paling bawah, Teks paling atas)
   const resolveStacking = useCallback((fCanvas: any) => {
     const objs = fCanvas.getObjects();
     objs.forEach((obj: any) => { 
@@ -72,7 +73,7 @@ const Editor: React.FC<EditorProps> = ({
     fCanvas.requestRenderAll();
   }, []);
 
-  // --- INISIALISASI PAPAN TULIS (CANVAS) ---
+  // Setting awal Papan Tulis (Canvas)
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { 
@@ -118,43 +119,44 @@ const Editor: React.FC<EditorProps> = ({
       }
     });
 
-    return () => { fCanvas.dispose(); fabricCanvasRef.current = null; };
+    return () => { fCanvas.dispose(); fabricCanvasRef.current = null; currentImgUrlRef.current = ""; };
   }, [page.id, resolveStacking, clampPosition]);
 
-  // --- PERBAIKAN: Memasang Gambar Latar (Background) ---
+  // --- PERBAIKAN: Fungsi Sync Ukuran & Gambar ---
   const syncCanvasSize = useCallback(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!containerRef.current || !fCanvas) return;
     
     const { width: contWidth, height: contHeight } = containerRef.current.getBoundingClientRect();
-    if (contWidth === 0) return;
+    if (contWidth === 0 || !page.imageUrl) return;
 
-    // Memuat gambar dari URL
+    // Jika gambar sudah ada, tinggal disesuaikan ukurannya saja (tidak download ulang)
+    const existingBg = fCanvas.backgroundImage;
+    if (existingBg && currentImgUrlRef.current === page.imageUrl) {
+        const imgRatio = existingBg.width / existingBg.height;
+        let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
+        if (finalHeight > contHeight) { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
+        
+        fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
+        existingBg.set({ scaleX: finalWidth / existingBg.width, scaleY: finalHeight / existingBg.height });
+        setContainerSize({ width: finalWidth, height: finalHeight });
+        callbacks.current.onResize(finalWidth);
+        fCanvas.requestRenderAll();
+        return;
+    }
+
+    // Jika gambarnya baru atau belum ada, baru download
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
       if (!img || !fabricCanvasRef.current) return;
+      currentImgUrlRef.current = page.imageUrl;
       
       const imgRatio = img.width / img.height; 
       let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
+      if (finalHeight > contHeight) { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
       
-      if (finalHeight > contHeight) { 
-        finalHeight = contHeight; 
-        finalWidth = contHeight * imgRatio; 
-      }
-      
-      // 1. Atur dulu ukuran papan tulisnya
       fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
+      img.set({ scaleX: finalWidth/img.width, scaleY: finalHeight/img.height, left: 0, top: 0, selectable: false, evented: false });
       
-      // 2. Atur ukuran gambarnya biar pas
-      img.set({ 
-        scaleX: finalWidth / img.width, 
-        scaleY: finalHeight / img.height, 
-        left: 0, 
-        top: 0, 
-        selectable: false, 
-        evented: false 
-      });
-      
-      // 3. Pasang gambarnya dan kunci biar nggak hilang (renderAll)
       fCanvas.setBackgroundImage(img, () => {
         setContainerSize({ width: finalWidth, height: finalHeight });
         callbacks.current.onResize(finalWidth);
@@ -165,13 +167,16 @@ const Editor: React.FC<EditorProps> = ({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const observer = new ResizeObserver(() => syncCanvasSize());
+    const observer = new ResizeObserver(() => {
+        // Hanya sync jika ukuran berubah signifikan untuk hindari flicker
+        syncCanvasSize();
+    });
     observer.observe(containerRef.current);
     syncCanvasSize();
     return () => observer.disconnect();
   }, [syncCanvasSize]);
 
-  // --- MENGGAMBAR OBJEK (TEXT, MASK, SHAPE) ---
+  // Menggambar Objek (Teks, Kotak Dialog, Mask)
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
@@ -234,9 +239,10 @@ const Editor: React.FC<EditorProps> = ({
         text: content, 
         stroke: obj.outlineColor, 
         strokeWidth: obj.outlineWidth,
-        paintFirst: 'stroke', // Supaya garis di luar teks
+        paintFirst: 'stroke', // RAHASIA: Gambar garis dulu baru warna isi
         strokeLineJoin: 'round',
         strokeUniform: true,
+        objectCaching: false, // Memastikan outline selalu terupdate rapi
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
       
