@@ -42,7 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Text Color</label>
+          <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Color</label>
           <input type="color" value={style.color} onChange={(e) => updateActiveStyle({ color: e.target.value })} className="w-full h-8 rounded bg-slate-900 border border-slate-700" />
         </div>
         <div>
@@ -112,14 +112,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-6 border-b border-slate-800 flex items-center justify-between">
         <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">Comic Editor</h1>
         <div className="flex gap-2">
-          <button onClick={onExportZip} disabled={isExporting} className="p-2 text-slate-400 hover:text-green-500"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4-4v12" /></svg></button>
-          <button onClick={onClearAll} className="p-2 text-slate-400 hover:text-red-500"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+          <button onClick={onExportZip} disabled={isExporting} className="p-2 text-slate-400 hover:text-green-500 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4-4v12" />
+            </svg>
+          </button>
+          <button onClick={onClearAll} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-800">
         <section className="bg-slate-900/30 p-4 rounded-xl border border-slate-800/50">
           <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Import Text</h3>
-          <textarea placeholder="Page 1 - Character: Text..." className="w-full h-24 bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs outline-none focus:ring-1 focus:ring-blue-500 transition-all resize-none" onBlur={(e) => onTextImport(e.target.value)} />
+          <textarea 
+            placeholder="Page 1 - Character: Text..." 
+            className="w-full h-24 bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs outline-none focus:ring-1 focus:ring-blue-500 transition-all resize-none" 
+            onBlur={(e) => onTextImport(e.target.value)} 
+          />
         </section>
 
         <section className="bg-blue-900/10 p-4 rounded-xl border border-blue-900/30 space-y-3">
@@ -132,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
           {selectedPage && !state.isGalleryView && (
-            <button onClick={() => onToggleLocal(selectedPage.id)} className={`w-full py-2 text-[10px] font-bold rounded border transition-colors ${selectedPage.isLocalStyle ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
+            <button onClick={() => onToggleLocal(selectedPage.id)} className={`w-full py-2 text-[10px] font-bold rounded border transition-colors ${selectedPage.isLocalStyle ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
               {selectedPage.isLocalStyle ? 'LOCAL OVERRIDE ACTIVE' : 'USE GLOBAL SETTINGS'}
             </button>
           )}
@@ -146,7 +158,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         {selectedPage && (
           <section className="p-4 border border-slate-800 rounded-xl bg-slate-900/20 space-y-3">
             <button onClick={() => onAddText(selectedPage.id)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-500">+ Manual Text Box</button>
-            <button onClick={() => onAddMask(selectedPage.id)} className="w-full py-2 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-xs font-bold hover:bg-slate-600 flex items-center justify-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>+ Paint Bucket (Mask)</button>
+            <button onClick={() => onAddMask(selectedPage.id)} className="w-full py-2 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-xs font-bold hover:bg-slate-600 flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              + Paint Bucket (Mask)
+            </button>
             {selectedText && (
               <div className="mt-2 pt-2 border-t border-slate-800 space-y-2">
                 <textarea value={selectedText.originalText} onChange={(e) => onUpdateText(selectedPage.id, selectedText.id, { originalText: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-xs h-24 outline-none focus:ring-1 focus:ring-blue-500 resize-none" />

@@ -122,6 +122,7 @@ const Editor: React.FC<EditorProps> = ({
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
     isRenderingRef.current = true;
+    
     const textIds = page.textObjects.map(t => t.id);
     const maskIds = (page.masks || []).map(m => m.id);
     fCanvas.getObjects().forEach((obj: any) => {
@@ -143,8 +144,14 @@ const Editor: React.FC<EditorProps> = ({
       const posY = (obj.y / 100) * containerSize.height;
       const fWidth = importMode === 'full' ? containerSize.width - (obj.paddingLeft + obj.paddingRight + 40) : obj.width;
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
-      const tProps = { width: fWidth, fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, stroke: obj.outlineColor, strokeWidth: obj.outlineWidth, shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) };
       
+      const tProps = { 
+        width: fWidth, fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
+        originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content,
+        stroke: obj.outlineColor, strokeWidth: obj.outlineWidth, paintFirst: 'stroke', strokeUniform: true,
+        shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
+      };
+
       if (obj.boxShape && obj.boxShape !== 'none') {
         let shapeObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'shape');
         const textH = fObj ? fObj.height * fObj.scaleY : obj.fontSize * 2;

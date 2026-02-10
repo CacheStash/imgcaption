@@ -53,7 +53,7 @@ export interface Page {
   masks?: MaskObject[]; 
   isLocalStyle?: boolean;
   localStyle?: TextStyle;
-  importMode?: ImportMode;
+  importMode?: ImportMode; 
 }
 
 export interface AppState {
