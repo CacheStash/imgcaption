@@ -19,7 +19,6 @@ export const parseRawText = (text: string, mode: ImportMode = 'box'): Record<num
   const result: Record<number, string[]> = {};
   const pageRegex = /Page\s+(\d+)\s*-\s*/gi;
   const sections = text.split(pageRegex);
-  
   for (let i = 1; i < sections.length; i += 2) {
     const pageNum = parseInt(sections[i], 10);
     let content = (sections[i + 1] || '').trim();
@@ -43,7 +42,6 @@ export const createDefaultTextObject = (content: string, style: TextStyle, mode:
   return { id: generateId(), originalText: content, x, y, width: mode === 'full' ? 700 : 400, ...style };
 };
 
-// FIX: Sinkronisasi dengan properti baru di types.ts
 export const DEFAULT_STYLE: TextStyle = {
   fontSize: 24,
   paddingTop: 15,
@@ -51,8 +49,8 @@ export const DEFAULT_STYLE: TextStyle = {
   paddingBottom: 15,
   paddingLeft: 15,
   color: '#ffffff',
-  backgroundColor: '#000000', // Default Background Hitam
-  boxShape: 'none',           // Default Transparan
+  backgroundColor: '#000000', 
+  boxShape: 'none',           
   alignment: 'center',
   verticalAlignment: 'middle',
   outlineColor: '#000000',

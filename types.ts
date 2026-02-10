@@ -1,7 +1,6 @@
 export type Alignment = 'left' | 'center' | 'right';
 export type VerticalAlignment = 'top' | 'middle' | 'bottom';
 export type ImportMode = 'full' | 'box';
-// Fitur Baru: Pilihan bentuk dialog box
 export type BoxShape = 'none' | 'rect' | 'rounded' | 'oval'; 
 
 export interface TextStyle {
@@ -11,8 +10,8 @@ export interface TextStyle {
   paddingBottom: number;
   paddingLeft: number;
   color: string;
-  backgroundColor?: string; // Fitur Baru: Warna latar dialog
-  boxShape?: BoxShape;      // Fitur Baru: Bentuk dialog
+  backgroundColor?: string; 
+  boxShape?: BoxShape;      
   alignment: Alignment; 
   verticalAlignment: VerticalAlignment; 
   outlineColor: string;
@@ -33,9 +32,9 @@ export interface TextObject extends TextStyle {
 
 export interface MaskObject {
   id: string;
-  x: number;
-  y: number;
-  width: number;
+  x: number; 
+  y: number; 
+  width: number; 
   height: number;
   fill: string;
 }
