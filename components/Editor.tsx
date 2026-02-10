@@ -33,7 +33,7 @@ const Editor: React.FC<EditorProps> = ({
     callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize]);
 
-  // --- FITUR TETAP: Anti-Nabrak ---
+  // --- FITUR TETAP: Menjaga posisi teks agar tidak keluar batas ---
   const clampPosition = useCallback((obj: any, data: TextObject) => {
     if (!containerSize.width || !containerSize.height) return;
     const width = obj.width * obj.scaleX;
@@ -61,7 +61,7 @@ const Editor: React.FC<EditorProps> = ({
     }
   }, [containerSize]);
 
-  // --- FITUR TETAP: Tumpukan Objek ---
+  // --- FITUR TETAP: Mengatur tumpukan (Mask di bawah, Text di atas) ---
   const resolveStacking = useCallback((fCanvas: any) => {
     const objs = fCanvas.getObjects();
     objs.forEach((obj: any) => { 
@@ -72,7 +72,7 @@ const Editor: React.FC<EditorProps> = ({
     fCanvas.requestRenderAll();
   }, []);
 
-  // --- INISIALISASI ---
+  // --- INISIALISASI PAPAN TULIS (CANVAS) ---
   useEffect(() => {
     if (!canvasRef.current) return;
     const fCanvas = new fabric.Canvas(canvasRef.current, { 
@@ -121,19 +121,17 @@ const Editor: React.FC<EditorProps> = ({
     return () => { fCanvas.dispose(); fabricCanvasRef.current = null; };
   }, [page.id, resolveStacking, clampPosition]);
 
-  // --- PERBAIKAN UTAMA: Muat Gambar Background ---
+  // --- PERBAIKAN: Memasang Gambar Latar (Background) ---
   const syncCanvasSize = useCallback(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!containerRef.current || !fCanvas) return;
     
     const { width: contWidth, height: contHeight } = containerRef.current.getBoundingClientRect();
-    if (contWidth === 0 || !page.imageUrl) return;
+    if (contWidth === 0) return;
 
-    // Bersihkan dulu background lama supaya tidak kedip/tumpuk
-    fCanvas.setBackgroundImage(null, fCanvas.renderAll.bind(fCanvas));
-
+    // Memuat gambar dari URL
     fabric.Image.fromURL(page.imageUrl, (img: any) => {
-      if (!img) return;
+      if (!img || !fabricCanvasRef.current) return;
       
       const imgRatio = img.width / img.height; 
       let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
@@ -143,10 +141,10 @@ const Editor: React.FC<EditorProps> = ({
         finalWidth = contHeight * imgRatio; 
       }
       
-      // Atur ukuran papan tulis (canvas)
+      // 1. Atur dulu ukuran papan tulisnya
       fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
       
-      // Atur ukuran foto supaya pas di papan tulis
+      // 2. Atur ukuran gambarnya biar pas
       img.set({ 
         scaleX: finalWidth / img.width, 
         scaleY: finalHeight / img.height, 
@@ -156,7 +154,7 @@ const Editor: React.FC<EditorProps> = ({
         evented: false 
       });
       
-      // Pasang foto dan paksa layar gambar ulang
+      // 3. Pasang gambarnya dan kunci biar nggak hilang (renderAll)
       fCanvas.setBackgroundImage(img, () => {
         setContainerSize({ width: finalWidth, height: finalHeight });
         callbacks.current.onResize(finalWidth);
@@ -173,13 +171,12 @@ const Editor: React.FC<EditorProps> = ({
     return () => observer.disconnect();
   }, [syncCanvasSize]);
 
-  // --- RENDER OBJEK (TEXT & MASK) ---
+  // --- MENGGAMBAR OBJEK (TEXT, MASK, SHAPE) ---
   useEffect(() => {
     const fCanvas = fabricCanvasRef.current;
     if (!fCanvas || containerSize.width === 0) return;
     isRenderingRef.current = true;
     
-    // Hapus objek yang sudah tidak ada di data
     const textIds = page.textObjects.map(t => t.id);
     const maskIds = (page.masks || []).map(m => m.id);
     fCanvas.getObjects().forEach((obj: any) => {
@@ -192,7 +189,7 @@ const Editor: React.FC<EditorProps> = ({
       }
     });
 
-    // Gambar Mask
+    // Render Masks
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
       const props = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
@@ -200,7 +197,7 @@ const Editor: React.FC<EditorProps> = ({
       else if (fObj !== fCanvas.getActiveObject()) { fObj.set(props); }
     });
 
-    // Gambar Text & Balon Kata
+    // Render Text & Shapes
     page.textObjects.forEach((obj) => {
       const content = cleanText(obj.originalText, hideLabels);
       const posX = (obj.x / 100) * containerSize.width;
@@ -226,7 +223,6 @@ const Editor: React.FC<EditorProps> = ({
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       
-      // PERBAIKAN: Outline tetap rapi di luar
       const tProps = { 
         width: fWidth, 
         fontSize: obj.fontSize, 
@@ -238,7 +234,7 @@ const Editor: React.FC<EditorProps> = ({
         text: content, 
         stroke: obj.outlineColor, 
         strokeWidth: obj.outlineWidth,
-        paintFirst: 'stroke', 
+        paintFirst: 'stroke', // Supaya garis di luar teks
         strokeLineJoin: 'round',
         strokeUniform: true,
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
