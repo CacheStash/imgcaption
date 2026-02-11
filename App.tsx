@@ -436,6 +436,7 @@ const App: React.FC = () => {
             fontWeight: obj.fontWeight || 'normal',
             stroke: obj.outlineColor, strokeWidth: obj.outlineWidth*scale, 
             fontFamily: obj.fontFamily || 'Inter', strokeUniform: true, paintFirst: 'stroke', 
+            strokeLineJoin: 'round', // FIX: Match editor's rounded stroke appearance
             shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur*scale, opacity: obj.glowOpacity }) 
           });
           
