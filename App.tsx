@@ -93,6 +93,26 @@ const App: React.FC = () => {
   }, [undo, redo, deleteSelectedElement]);
 
   useEffect(() => {
+
+    const duplicateSelectedElement = useCallback(() => {
+    if (!selectedPage) return;
+    const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
+    const maskObj = selectedPage.masks?.find(m => m.id === state.selectedMaskId);
+    
+    if (!textObj && !maskObj) return;
+    recordHistory();
+
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === selectedPage.id ? {
+        ...p,
+        textObjects: textObj ? [...p.textObjects, { ...textObj, id: generateId(), x: textObj.x + 5, y: textObj.y + 5 }] : p.textObjects,
+        masks: maskObj ? [...(p.masks || []), { ...maskObj, id: generateId(), x: maskObj.x + 5, y: maskObj.y + 5 }] : p.masks
+      } : p)
+    }));
+  }, [selectedPage, state.selectedTextId, state.selectedMaskId, recordHistory]);
+
+  
     localStorage.setItem('comic-editor-state-v10', JSON.stringify({
       globalStyle: state.globalStyle,
       savedStyles: state.savedStyles,

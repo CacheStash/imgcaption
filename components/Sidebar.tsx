@@ -16,17 +16,25 @@ interface SidebarProps {
   onDownloadSingle: () => void;
   onToggleLocal: (pageId: string) => void;
   isExporting: boolean;
-  onSplitText: () => void; // Prop baru
+  onSplitText: () => void;
+  onDuplicate?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  state, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText
+  state, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText, onDuplicate
 }) => {
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
   const selectedText = selectedPage?.textObjects.find(t => t.id === state.selectedTextId);
-  const selectedMask = selectedPage?.masks?.find(m => m.id === state.selectedMaskId); // Cari mask aktif
+  const selectedMask = selectedPage?.masks?.find(m => m.id === state.selectedMaskId);
+  
   const activeStyle = (selectedPage?.isLocalStyle && selectedPage.localStyle) ? selectedPage.localStyle : state.globalStyle;
   const activeImportMode = (selectedPage?.isLocalStyle && selectedPage.importMode) ? selectedPage.importMode : state.importMode;
+
+  // Gabungkan semua objek untuk daftar layer (Layer Manager)
+  const allLayers = [
+    ...(selectedPage?.masks || []).map(m => ({ ...m, layerType: 'Mask' as const })),
+    ...(selectedPage?.textObjects || []).map(t => ({ ...t, layerType: 'Text' as const, label: t.originalText.substring(0, 15) }))
+  ];
 
   const updateActiveStyle = (updates: Partial<TextStyle>) => {
     onUpdateGlobalStyle({ ...activeStyle, ...updates });
@@ -63,7 +71,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         <input type="number" value={style.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-2" />
       </div>
 
-      {/* FITUR BARU: DIALOG BOX STYLE */}
       <div className="border-t border-slate-800 pt-3">
         <label className="block text-[10px] text-blue-400 mb-2 font-bold uppercase">Dialog Box Style</label>
         <div className="grid grid-cols-2 gap-2 mb-2">
@@ -194,7 +201,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               + Paint Bucket (Manual Box)
             </button>
 
-            {/* FITUR 3: Smart Bucket Toggle */}
             <button 
                onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextId: null, selectedMaskId: null }))} 
                className={`w-full mt-2 py-2 border rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-pink-500 hover:text-pink-500'}`}
@@ -203,7 +209,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               {state.isSmartFillMode ? 'CLICK IMAGE TO FILL...' : 'Smart Bucket (Auto Fill)'}
             </button>
 
-            {/* PANEL 1: Mask Settings (Muncul jika Mask dipilih) */}
             {selectedMask && (
               <div className="mt-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <h4 className="text-[10px] text-slate-400 font-bold uppercase mb-2">Mask Settings</h4>
@@ -237,7 +242,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
 
-            {/* PANEL 2: Text Box Settings (Sekarang diletakkan di bawah Mask Setting agar tidak hilang) */}
             {selectedText && (
               <div className="mt-4 space-y-3 pt-4 border-t border-slate-800">
                  <h4 className="text-[10px] text-blue-400 font-bold uppercase">Text Editing</h4>
@@ -251,6 +255,37 @@ const Sidebar: React.FC<SidebarProps> = ({
           </section>
         )}
       </div>
+
+      {selectedPage && (
+        <div className="mx-6 mb-6 p-4 bg-slate-900/50 border border-slate-800 rounded-xl flex flex-col h-64">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Layer Manager</h3>
+            <button onClick={onDuplicate} className="text-[9px] bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700">Duplicate</button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto space-y-1 pr-2 scrollbar-thin">
+            {allLayers.reverse().map((layer) => (
+              <div 
+                key={layer.id}
+                onClick={() => {
+                  if (layer.layerType === 'Text') setState(p => ({ ...p, selectedTextId: layer.id, selectedMaskId: null }));
+                  else setState(p => ({ ...p, selectedMaskId: layer.id, selectedTextId: null }));
+                }}
+                className={`flex items-center gap-2 p-2 rounded text-[10px] cursor-pointer transition-all ${
+                  state.selectedTextId === layer.id || state.selectedMaskId === layer.id 
+                  ? 'bg-blue-600/20 border border-blue-500/50 text-blue-100' 
+                  : 'bg-slate-950/50 border border-transparent text-slate-400 hover:bg-slate-800'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${layer.layerType === 'Text' ? 'bg-amber-500' : 'bg-blue-500'}`}></div>
+                <span className="flex-1 truncate">{layer.layerType === 'Text' ? `[T] ${layer.label}...` : `[M] Mask Layer`}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold bg-slate-950">v2.1.2 Pro</div>
     </aside>
   );

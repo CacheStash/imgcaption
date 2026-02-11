@@ -236,9 +236,17 @@ const Editor: React.FC<EditorProps> = ({
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
         width: textWidth,
-        fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
-        originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, 
-        stroke: obj.outlineColor, strokeWidth: obj.outlineWidth,
+        fontSize: obj.fontSize, 
+        fill: obj.color, 
+        textAlign: 'center', 
+        originX: 'center', 
+        originY: 'center', 
+        fontFamily: obj.fontFamily, 
+        text: content, 
+        splitByGrapheme: false, // Menghindari pemotongan kata di tengah huruf
+        dynamicMinWidth: 50,    // Mencegah box menciut terlalu kecil saat diedit
+        stroke: obj.outlineColor, 
+        strokeWidth: obj.outlineWidth,
         paintFirst: 'stroke', strokeLineJoin: 'round',
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
