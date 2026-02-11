@@ -1,6 +1,7 @@
 export type Alignment = 'left' | 'center' | 'right';
 export type VerticalAlignment = 'top' | 'middle' | 'bottom';
 export type ImportMode = 'full' | 'box';
+// Fitur Baru: Pilihan bentuk dialog box
 export type BoxShape = 'none' | 'rect' | 'rounded' | 'oval'; 
 
 export interface TextStyle {
@@ -10,8 +11,8 @@ export interface TextStyle {
   paddingBottom: number;
   paddingLeft: number;
   color: string;
-  backgroundColor?: string;
-  boxShape?: BoxShape;
+  backgroundColor?: string; // Fitur Baru: Warna latar dialog
+  boxShape?: BoxShape;      // Fitur Baru: Bentuk dialog
   alignment: Alignment; 
   verticalAlignment: VerticalAlignment; 
   outlineColor: string;
@@ -20,6 +21,23 @@ export interface TextStyle {
   glowBlur: number;
   glowOpacity: number;
   fontFamily: string;
+  type?: 'rect' | 'image'; // Fitur Baru: Membedakan kotak manual vs smart fill
+  maskDataUrl?: string;    // Fitur Baru: Menyimpan gambar hasil paint bucket
+  
+}
+
+
+export interface AppState {
+  pages: Page[];
+  hideLabels: boolean;
+  importMode: ImportMode;
+  selectedPageId: string | null;
+  selectedTextId: string | null;
+  selectedMaskId?: string | null;
+  isGalleryView: boolean;
+  globalStyle: TextStyle;
+  savedStyles: SavedStyle[];
+  isSmartFillMode?: boolean; // Fitur Baru: Toggle mode paint bucket
 }
 
 export interface TextObject extends TextStyle {
@@ -37,8 +55,8 @@ export interface MaskObject {
   width: number;
   height: number;
   fill: string;
-  type?: 'rect' | 'image'; 
-  maskDataUrl?: string;    
+type?: 'rect' | 'image'; // Fix: Tambah properti ini
+  maskDataUrl?: string;    // Fix: Tambah properti ini
   opacity?: number;
 }
 
@@ -69,5 +87,5 @@ export interface AppState {
   isGalleryView: boolean;
   globalStyle: TextStyle;
   savedStyles: SavedStyle[];
-  isSmartFillMode?: boolean; 
+  isSmartFillMode?: boolean; // Fix: Tambah properti ini
 }
