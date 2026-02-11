@@ -62,6 +62,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
+      {/* Tombol Font Bold */}
+      <div className="flex gap-2">
+        <button 
+          onClick={() => updateActiveStyle({ fontWeight: style.fontWeight === 'bold' ? 'normal' : 'bold' })}
+          className={`flex-1 h-8 rounded border text-[10px] font-bold transition-all ${style.fontWeight === 'bold' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500'}`}
+        >
+          {style.fontWeight === 'bold' ? 'BOLD ACTIVE' : 'SET BOLD'}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 gap-2">
         <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Font Size</label>
         <input type="number" value={style.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-2" />
@@ -225,6 +235,28 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <span>{Math.round((selectedMask.opacity ?? 1) * 100)}%</span>
                 </div>
                 <input type="range" min="0" max="1" step="0.05" value={selectedMask.opacity ?? 1} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })} className="w-full accent-blue-500 h-1.5" />
+              </div>
+            )}
+            {/* FITUR BARU: Shape & Outline untuk Manual Mask */}
+            {selectedMask && selectedMask.type !== 'image' && (
+              <div className="mt-2 space-y-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div>
+                  <label className="block text-[9px] text-slate-500 uppercase mb-1 font-bold">Bubble Shape</label>
+                  <div className="flex bg-slate-900 rounded p-1 gap-1">
+                    <button onClick={() => onUpdateMask(selectedPage.id, selectedMask.id, { shape: 'rect' })} className={`flex-1 py-1 text-[9px] font-bold rounded ${selectedMask.shape !== 'oval' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>Square</button>
+                    <button onClick={() => onUpdateMask(selectedPage.id, selectedMask.id, { shape: 'oval' })} className={`flex-1 py-1 text-[9px] font-bold rounded ${selectedMask.shape === 'oval' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>Oval</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[9px] text-slate-500 uppercase mb-1 font-bold">Outline Color</label>
+                    <input type="color" value={selectedMask.stroke || '#000000'} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { stroke: e.target.value })} className="w-full h-7 rounded bg-slate-900 border border-slate-700" />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-slate-500 uppercase mb-1 font-bold">Thickness</label>
+                    <input type="number" value={selectedMask.strokeWidth || 0} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { strokeWidth: Number(e.target.value) })} className="w-full h-7 bg-slate-900 border border-slate-700 rounded text-[9px] px-1" />
+                  </div>
+                </div>
               </div>
             )}
           </section>

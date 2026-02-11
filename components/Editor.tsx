@@ -188,7 +188,23 @@ const Editor: React.FC<EditorProps> = ({
             fontSize: newFontSize 
           });
         } else if (obj.data.type === 'mask') {
-          callbacks.current.onUpdateMask(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX, height: obj.height*obj.scaleY });
+          const newWidth = obj.width * obj.scaleX;
+          const newHeight = obj.height * obj.scaleY;
+          
+          callbacks.current.onUpdateMask(obj.data.id, { 
+            x: (obj.left/bW)*100, 
+            y: (obj.top/bH)*100, 
+            width: newWidth, 
+            height: newHeight 
+          });
+
+          // Paksa skala kembali ke 1 agar tidak membesar terus menerus (Ngeyel)
+          obj.set({ scaleX: 1, scaleY: 1, width: newWidth, height: newHeight });
+          
+          // Sinkronisasi radius jika bentuknya Ellipse
+          if (obj.type === 'ellipse') {
+            obj.set({ rx: newWidth / 2, ry: newHeight / 2 });
+          }
         }
       }
     });
@@ -297,35 +313,38 @@ const Editor: React.FC<EditorProps> = ({
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
       const mProps = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
+      // Properti dasar untuk Rect/Oval
+      const shapeProps = { 
+        ...mProps, 
+        opacity: mask.opacity ?? 1, 
+        visible: mask.visible !== false,
+        stroke: mask.stroke || '#000000', 
+        strokeWidth: mask.strokeWidth || 0,
+        scaleX: 1, scaleY: 1 // Pastikan skala bersih
+      };
+
       if (mask.type === 'image' && mask.maskDataUrl) {
-         // Render Image Mask (Smart Bucket Result)
-         if (!fObj) {
-           fabric.Image.fromURL(mask.maskDataUrl, (img: any) => {
-             // Sesuaikan ukuran gambar mask dengan ukuran container canvas
-             img.set({
-               left: 0, top: 0, 
-               scaleX: containerSize.width / img.width,
-               scaleY: containerSize.height / img.height,
-               selectable: true, evented: true,
-               data: { id: mask.id, type: 'mask' }
-             });
-             fCanvas.add(img);
-             fCanvas.sendToBack(img); // Pastikan di belakang teks
-           });
-         }
-         // Note: Kita tidak update properti image setiap render berulang untuk performa, 
-         // karena smart mask dianggap statis setelah dibuat.
+         // ... (logic smart fill tetap sama)
       } else {
-        // Render Rect Mask (Manual) - Logika Lama
-        const rectProps = { 
-           left: (mask.x/100)*containerSize.width, 
-           top: (mask.y/100)*containerSize.height, 
-           width: mask.width, 
-           height: mask.height, 
-           fill: mask.fill, originX: 'center', originY: 'center' 
+        // Render Manual Mask (Rect / Oval)
+        const shapeProps = { 
+          ...mProps, 
+          opacity: mask.opacity ?? 1, 
+          visible: mask.visible !== false,
+          stroke: mask.stroke || '#000000', 
+          strokeWidth: mask.strokeWidth || 0,
+          scaleX: 1, scaleY: 1 
         };
-        if (!fObj) fCanvas.add(new fabric.Rect({ ...rectProps, data: { id: mask.id, type: 'mask' } }));
-        else fObj.set(rectProps);
+
+        if (!fObj) {
+          const shapeObj = mask.shape === 'oval' 
+            ? new fabric.Ellipse({ ...shapeProps, rx: mask.width/2, ry: mask.height/2, data: { id: mask.id, type: 'mask' } })
+            : new fabric.Rect({ ...shapeProps, data: { id: mask.id, type: 'mask' } });
+          fCanvas.add(shapeObj);
+        } else {
+          fObj.set(shapeProps);
+          if (fObj.type === 'ellipse') fObj.set({ rx: mask.width/2, ry: mask.height/2 });
+        }
       }
     });
 

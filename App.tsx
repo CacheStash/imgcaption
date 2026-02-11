@@ -260,10 +260,20 @@ const App: React.FC = () => {
   // FIX: Handler Add Mask
   const addMaskManually = useCallback((pageId: string) => {
     recordHistory();
-    const newMask: MaskObject = { id: generateId(), x: 50, y: 50, width: 200, height: 100, fill: '#FFFFFF' };
+    const newMask: MaskObject = { 
+      id: generateId(), x: 50, y: 50, width: 200, height: 100, 
+      fill: '#FFFFFF', shape: 'rect', stroke: '#000000', strokeWidth: 0 
+    };
+    // Menambahkan default properties untuk bentuk dan outline agar tidak undefined
+    const newMaskWithDefaults: MaskObject = { 
+      ...newMask, 
+      shape: 'rect', 
+      stroke: '#000000', 
+      strokeWidth: 0 
+    };
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), newMask] } : p),
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), newMaskWithDefaults] } : p),
       selectedTextId: null,
       selectedMaskId: newMask.id
     }));
@@ -371,6 +381,7 @@ const App: React.FC = () => {
 
         // Draw Masks
         (page.masks || []).forEach(m => {
+          
           staticCanvas.add(new fabric.Rect({ 
             left: (m.x/100)*oW, top: (m.y/100)*oH, 
             width: m.width*scale, height: m.height*scale, 
