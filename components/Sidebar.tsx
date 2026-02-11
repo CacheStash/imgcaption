@@ -136,13 +136,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
         
-        <label className="block text-[9px] text-slate-500 mb-1 uppercase">Padding (Inner Spacing)</label>
-        <div className="grid grid-cols-2 gap-2">
+        <label className="block text-[9px] text-slate-500 mb-1 uppercase">Page Margin (Safe Area / Snapping Offset)</label>
+        <div className="grid grid-cols-4 gap-1">
           {['Top', 'Bottom', 'Left', 'Right'].map((dir) => (
             <div key={dir} className="flex flex-col">
+              <span className="text-[7px] text-slate-600 mb-0.5 text-center font-bold">{dir.toUpperCase()}</span>
               <input 
                 type="number" 
-                placeholder={dir}
                 value={(style as any)[`padding${dir}`]} 
                 onChange={(e) => updateActiveStyle({ [`padding${dir}`]: Number(e.target.value) })} 
                 className="h-7 bg-slate-900 border border-slate-700 rounded text-[10px] px-1 text-center" 
@@ -155,18 +155,22 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex flex-col">
         <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Box Position / Snapping</label>
         <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden mb-1">
-          {(['left', 'center', 'right'] as Alignment[]).map((align) => (
-            <button key={align} onClick={() => updateActiveStyle({ alignment: align })} className={`flex-1 text-[10px] uppercase font-bold ${style.alignment === align ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{align[0]}</button>
+          {(['left', 'center', 'right', 'none'] as Alignment[]).map((align) => (
+            <button key={align} onClick={() => updateActiveStyle({ alignment: align })} className={`flex-1 text-[10px] uppercase font-bold ${style.alignment === align ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>
+              {align === 'none' ? 'OFF' : align[0]}
+            </button>
           ))}
         </div>
         <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden mb-3">
-          {(['top', 'middle', 'bottom'] as VerticalAlignment[]).map((vAlign) => (
-            <button key={vAlign} onClick={() => updateActiveStyle({ verticalAlignment: vAlign })} className={`flex-1 text-[10px] uppercase font-bold ${style.verticalAlignment === vAlign ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{vAlign[0]}</button>
+          {(['top', 'middle', 'bottom', 'none'] as VerticalAlignment[]).map((vAlign) => (
+            <button key={vAlign} onClick={() => updateActiveStyle({ verticalAlignment: vAlign })} className={`flex-1 text-[10px] uppercase font-bold ${style.verticalAlignment === vAlign ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>
+              {vAlign === 'none' ? 'OFF' : vAlign[0]}
+            </button>
           ))}
         </div>
 
         <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Paragraph Align (Inside Box)</label>
-        <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden">
+         <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden">
           {(['left', 'center', 'right'] as Alignment[]).map((align) => (
             <button key={align} onClick={() => updateActiveStyle({ textAlign: align })} className={`flex-1 text-[10px] uppercase font-bold ${style.textAlign === align ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{align[0]}</button>
           ))}
