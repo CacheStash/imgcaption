@@ -269,9 +269,22 @@ const Editor: React.FC<EditorProps> = ({
       // FIX 2: SINKRONISASI LEBAR & PADDING (Sama dengan Logika Download)
       const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
       
-      // FIX: Gunakan obj.width state secara langsung untuk mode Box agar tidak "ngeyel" menciut
+      // 1. RESET LOGIKA POSITIONING (SNAPPING)
+      // L/C/R untuk Horizontal (X) | T/M/B untuk Vertical (Y)
+      let calculatedX = posX;
+      if (obj.alignment === 'left') calculatedX = (5 / 100) * containerSize.width;
+      else if (obj.alignment === 'center') calculatedX = containerSize.width / 2;
+      else if (obj.alignment === 'right') calculatedX = (95 / 100) * containerSize.width;
+
+      let calculatedY = posY;
+      if (obj.verticalAlignment === 'top') calculatedY = (5 / 100) * containerSize.height;
+      else if (obj.verticalAlignment === 'middle') calculatedY = containerSize.height / 2;
+      else if (obj.verticalAlignment === 'bottom') calculatedY = (95 / 100) * containerSize.height;
+
+      // 2. LOGIKA TIGHT BOX & PADDING INTERNAL
+      // Lebar box tidak lagi dikurangi padding halaman agar tidak "lepas" dari teks
       const textWidth = importMode === 'full' 
-        ? Math.max(50, containerSize.width - 40 - horizontalPadding) 
+        ? Math.max(50, containerSize.width - 40) 
         : obj.width;
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
@@ -279,11 +292,11 @@ const Editor: React.FC<EditorProps> = ({
         width: textWidth,
         fontSize: obj.fontSize, 
         fill: obj.color, 
-        textAlign: obj.textAlign || 'center', // Paragraph Align (Inside Box)
-        originX: obj.alignment || 'center',   // Box Position H (Anchor Point)
-        originY: obj.verticalAlignment === 'middle' ? 'center' : (obj.verticalAlignment || 'center'), // Box Position V (Anchor Point)
-        backgroundColor: obj.backgroundColor || 'transparent', // Dialog Box Background
-        padding: obj.paddingLeft || 0, // Fabric menggunakan padding seragam (diambil dari paddingLeft)
+        textAlign: obj.textAlign || 'center', // Paragraf di dalam
+        originX: obj.alignment || 'center',   // Snapping H
+        originY: obj.verticalAlignment === 'middle' ? 'center' : (obj.verticalAlignment || 'center'), // Snapping V
+        backgroundColor: obj.backgroundColor || 'transparent',
+        padding: obj.paddingLeft || 0, // Padding internal box
         fontFamily: obj.fontFamily, 
         text: content, 
         fontWeight: obj.fontWeight || 'normal',
@@ -298,13 +311,25 @@ const Editor: React.FC<EditorProps> = ({
       };
 
       if (!fObj) {
-        const newTxt = new fabric.Textbox(content, { ...tProps, left: posX, top: posY, data: { id: obj.id, type: 'text' } });
+        const newTxt = new fabric.Textbox(content, { ...tProps, left: calculatedX, top: calculatedY, data: { id: obj.id, type: 'text' } });
         fCanvas.add(newTxt);
         fObj = newTxt;
       } else if (!fObj.isEditing) {
-        fObj.set({ ...tProps, left: posX, top: posY });
-        fObj.setCoords(); // Memastikan area seleksi dan bentuk tetap stabil setelah perubahan origin
+        fObj.set({ ...tProps, left: calculatedX, top: calculatedY });
+        
+        // 3. LOGIKA "SEMEPET MUNGKIN" (Tight Fit)
+        if (importMode !== 'full') {
+          let maxLineW = 0;
+          for (let i = 0; i < fObj._textLines.length; i++) {
+            maxLineW = Math.max(maxLineW, fObj.getLineWidth(i));
+          }
+          if (maxLineW > 0) {
+            fObj.set({ width: maxLineW + 2 }); // Mepet ke teks terlebar
+          }
+        }
+        fObj.setCoords();
       }
+      
       });
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
