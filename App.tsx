@@ -2,7 +2,6 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle, ImportMode, MaskObject } from './types';
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
 import Sidebar from './components/Sidebar';
-
 import Gallery from './components/Gallery';
 import Editor from './components/Editor';
 import Uploader from './components/Uploader';
@@ -25,7 +24,7 @@ const App: React.FC = () => {
     const initial: AppState = {
       pages: [], hideLabels: false, importMode: 'box', selectedPageId: null,
       selectedTextId: null, selectedMaskId: null, isGalleryView: true, globalStyle: DEFAULT_STYLE, savedStyles: [],
-      isSmartFillMode: false // Default off
+      isSmartFillMode: false
     };
     if (saved) {
       try {
@@ -36,9 +35,9 @@ const App: React.FC = () => {
     return initial;
   });
 
-  const selectedPage = useMemo(() => state.pages.find(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);const currentPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
+  const selectedPage = useMemo(() => state.pages.find(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
+  const currentPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
 
-  // FIX: Kalkulasi Mode Efektif (Local vs Global) untuk dikirim ke Editor
   const effectiveImportMode = useMemo(() => {
     if (selectedPage?.isLocalStyle && selectedPage.importMode) return selectedPage.importMode;
     return state.importMode;
@@ -62,7 +61,6 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, pages: next }));
   }, [history, state.pages]);
 
-  // FIX: Delete Key untuk Teks DAN Mask
   const deleteSelectedElement = useCallback(() => {
     if (!state.selectedPageId) return;
     if (!state.selectedTextId && !state.selectedMaskId) return;
@@ -79,22 +77,7 @@ const App: React.FC = () => {
     }));
   }, [state.selectedPageId, state.selectedTextId, state.selectedMaskId, recordHistory]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isTyping = ['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable;
-      if (isTyping) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
-      if ((e.key === 'Delete' || e.key === 'Backspace')) { deleteSelectedElement(); }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, deleteSelectedElement]);
-
-  useEffect(() => {
-
-    const duplicateSelectedElement = useCallback(() => {
+  const duplicateSelectedElement = useCallback(() => {
     if (!selectedPage) return;
     const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
     const maskObj = selectedPage.masks?.find(m => m.id === state.selectedMaskId);
@@ -112,7 +95,20 @@ const App: React.FC = () => {
     }));
   }, [selectedPage, state.selectedTextId, state.selectedMaskId, recordHistory]);
 
-  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTyping = ['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable;
+      if (isTyping) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+      if ((e.key === 'Delete' || e.key === 'Backspace')) { deleteSelectedElement(); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, deleteSelectedElement]);
+
+  useEffect(() => {
     localStorage.setItem('comic-editor-state-v10', JSON.stringify({
       globalStyle: state.globalStyle,
       savedStyles: state.savedStyles,
@@ -139,7 +135,6 @@ const App: React.FC = () => {
         const pageNum = index + 1;
         if (parsedData[pageNum]) {
           const style = page.isLocalStyle && page.localStyle ? page.localStyle : prev.globalStyle;
-          // FIX: Gunakan mode lokal jika ada
           const mode = page.isLocalStyle && page.importMode ? page.importMode : state.importMode;
           const newObjects = parsedData[pageNum].map(txt => createDefaultTextObject(txt, style, mode));
           return { ...page, textObjects: [...page.textObjects, ...newObjects] };
@@ -175,46 +170,37 @@ const App: React.FC = () => {
     });
   }, [recordHistory]);
 
-// FITUR 1: Split Text (Fix Duplikasi)
   const splitSelectedText = useCallback(() => {
     if (!selectedPage || !state.selectedTextId) return;
     const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
     if (!textObj) return;
 
-    // Logika Pecah Box: Pisahkan berdasarkan tanda koma ( , )
-    // Regex ini memecah pada koma yang diikuti spasi, agar tidak memecah koma di dalam kalimat biasa jika memungkinkan
     const parts = textObj.originalText.split(/ , /).map(p => p.trim()).filter(p => p.length > 0);
-    
-    // Jika tidak ada koma ' , ', coba pecah berdasarkan baris baru seperti sebelumnya sebagai cadangan
     const lines = parts.length > 1 ? parts : textObj.originalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     
     if (lines.length <= 1) return;
-
     recordHistory();
     
     const newObjects: TextObject[] = lines.map((line, idx) => ({
       ...textObj,
       id: generateId(),
       originalText: line,
-      // Sebar posisi sedikit agar tidak bertumpuk sempurna
       y: Math.min(95, textObj.y + (idx * 3)), 
       height: undefined
     } as TextObject));
 
     setState(prev => ({
       ...prev,
-      // Jangan langsung null kan selectedTextId agar sidebar tidak kaget
       pages: prev.pages.map(p => p.id === selectedPage.id ? {
         ...p,
         textObjects: [
-          ...p.textObjects.filter(t => t.id !== textObj.id), // Hapus yang lama
+          ...p.textObjects.filter(t => t.id !== textObj.id), 
           ...newObjects 
         ]
       } : p)
     }));
   }, [selectedPage, state.selectedTextId, recordHistory]);
 
-  // FITUR 2: Smart Bucket Handler (Jangan hilangkan pilihan teks)
   const addSmartMask = useCallback((pageId: string, maskData: MaskObject) => {
     recordHistory();
     const finalMask = { ...maskData, opacity: 0.9 };
@@ -223,11 +209,9 @@ const App: React.FC = () => {
       pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), finalMask] } : p),
       isSmartFillMode: false,
       selectedMaskId: maskData.id
-      // HAPUS: selectedTextId: null agar setting text tidak hilang
     }));
   }, [recordHistory]);
 
-  // FIX: Handler Add Mask
   const addMaskManually = useCallback((pageId: string) => {
     recordHistory();
     const newMask: MaskObject = { id: generateId(), x: 50, y: 50, width: 200, height: 100, fill: '#FFFFFF' };
@@ -239,7 +223,6 @@ const App: React.FC = () => {
     }));
   }, [recordHistory]);
 
-  // FIX: Handler Update Mask
   const updateMask = useCallback((pageId: string, maskId: string, updates: Partial<MaskObject>) => {
     setState(prev => ({
       ...prev,
@@ -269,16 +252,13 @@ const App: React.FC = () => {
     setState(prev => ({
       ...prev,
       pages: prev.pages.map(p => (p.id === pageId) ? {
-        ...p, 
-        isLocalStyle: !p.isLocalStyle, 
-        // FIX: Copy juga importMode saat menyalakan local style
+        ...p, isLocalStyle: !p.isLocalStyle, 
         localStyle: !p.isLocalStyle ? JSON.parse(JSON.stringify(prev.globalStyle)) : undefined,
         importMode: !p.isLocalStyle ? prev.importMode : undefined
       } : p)
     }));
   }, [recordHistory]);
 
-  // Helper untuk Auto Activate Local (FIX Poin 4)
   const activatePageLocal = (page: Page, globalStyle: TextStyle, globalMode: ImportMode): Page => {
     if (page.isLocalStyle === undefined) {
       return { 
@@ -325,7 +305,6 @@ const App: React.FC = () => {
     }));
   }, []);
 
-  // FIX: Poin 3 (Export Sync)
   const renderToStaticCanvas = async (page: Page) => {
     const tempCanvas = document.createElement('canvas');
     const staticCanvas = new fabric.StaticCanvas(tempCanvas);
@@ -335,20 +314,24 @@ const App: React.FC = () => {
         staticCanvas.setDimensions({ width: oW, height: oH });
         staticCanvas.setBackgroundImage(img, staticCanvas.renderAll.bind(staticCanvas));
         const scale = oW / previewWidth;
-        
-        // FIX: Tentukan mode halaman untuk export
         const pageMode = page.isLocalStyle && page.importMode ? page.importMode : state.importMode;
 
-        // Draw Masks
         (page.masks || []).forEach(m => {
-          staticCanvas.add(new fabric.Rect({ 
-            left: (m.x/100)*oW, top: (m.y/100)*oH, 
-            width: m.width*scale, height: m.height*scale, 
-            fill: m.fill, originX: 'center', originY: 'center' 
-          }));
+          if (m.type === 'image' && m.maskDataUrl) {
+            fabric.Image.fromURL(m.maskDataUrl, (maskImg: any) => {
+              maskImg.set({ left: 0, top: 0, scaleX: oW/maskImg.width, scaleY: oH/maskImg.height, opacity: m.opacity ?? 1 });
+              staticCanvas.add(maskImg);
+              staticCanvas.sendToBack(maskImg);
+            });
+          } else {
+            staticCanvas.add(new fabric.Rect({ 
+              left: (m.x/100)*oW, top: (m.y/100)*oH, 
+              width: m.width*scale, height: m.height*scale, 
+              fill: m.fill, originX: 'center', originY: 'center', opacity: m.opacity ?? 1
+            }));
+          }
         });
 
-        // Draw Text with Clamping
         page.textObjects.forEach((obj) => {
           const content = cleanText(obj.originalText, state.hideLabels);
           const fWidth = pageMode === 'full' ? oW - ((obj.paddingLeft + obj.paddingRight + 40)*scale) : obj.width*scale;
@@ -375,8 +358,10 @@ const App: React.FC = () => {
         });
         
         staticCanvas.renderAll();
-        resolve(staticCanvas.toDataURL({ format: 'jpeg', quality: 0.85 }));
-        staticCanvas.dispose();
+        setTimeout(() => {
+          resolve(staticCanvas.toDataURL({ format: 'jpeg', quality: 0.85 }));
+          staticCanvas.dispose();
+        }, 100);
       });
     });
   };
@@ -387,7 +372,7 @@ const App: React.FC = () => {
     try {
       const dataUrl = await renderToStaticCanvas(selectedPage);
       const link = document.createElement('a');
-      link.href = dataUrl; link.download = `page_${currentPageIndex + 1}_${selectedPage.fileName.split('.')[0]}.jpg`; link.click();
+      link.href = dataUrl; link.download = `page_${currentPageIndex + 1}.jpg`; link.click();
     } catch (e) { alert("Download failed"); } finally { setIsExporting(false); }
   };
 
@@ -397,9 +382,8 @@ const App: React.FC = () => {
     const zip = new JSZip();
     try {
       for (let i = 0; i < state.pages.length; i++) {
-        const page = state.pages[i];
-        const dataUrl = await renderToStaticCanvas(page);
-        zip.file(`${String(i + 1).padStart(3, '0')}_${page.fileName.split('.')[0]}.jpg`, dataUrl.split(',')[1], { base64: true });
+        const dataUrl = await renderToStaticCanvas(state.pages[i]);
+        zip.file(`${String(i + 1).padStart(3, '0')}.jpg`, dataUrl.split(',')[1], { base64: true });
       }
       const content = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
@@ -419,7 +403,8 @@ const App: React.FC = () => {
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-        onSplitText={splitSelectedText} // Pass fungsi split
+        onSplitText={splitSelectedText}
+        onDuplicate={duplicateSelectedElement}
       />
       <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
         {state.pages.length === 0 ? (
@@ -430,27 +415,16 @@ const App: React.FC = () => {
               <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={handleSelectPage} />
             ) : (
               <div className="h-full flex flex-col items-center">
-                {/* ... (kode navigasi navbar tetap sama) ... */}
                 <div className="mb-4 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
                     <div className="flex items-center gap-2">
-                         {/* ... tombol back, prev, next, undo, redo tetap sama ... */}
                         <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextId: null }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
                         <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                        <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-                        <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Next"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
-                        <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
                         <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
-                        <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-                          </svg>
-                        </button>
+                        <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" /></svg></button>
                     </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p>
-                      <p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p>
-                    </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p>
+                    <p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p>
                   </div>
                 </div>
                 {selectedPage && (
@@ -462,7 +436,7 @@ const App: React.FC = () => {
                     onSelectMask={id => setState(p => ({ ...p, selectedMaskId: id, selectedTextId: null }))}
                     onRecordHistory={recordHistory} onResize={setPreviewWidth} 
                     isSmartFill={state.isSmartFillMode} 
-                    onAddSmartMask={(m) => addSmartMask(selectedPage.id, m)}// Prop baru
+                    onAddSmartMask={(m) => addSmartMask(selectedPage.id, m)}
                   />
                 )}
               </div>
