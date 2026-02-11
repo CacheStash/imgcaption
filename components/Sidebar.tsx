@@ -17,13 +17,18 @@ interface SidebarProps {
   onToggleLocal: (pageId: string) => void;
   isExporting: boolean;
   onSplitText: () => void; // Prop baru
+  // Tambahkan Props Baru ke Interface
+  onDuplicate?: () => void;
+  onDeleteLayer?: (id: string) => void;
+  onToggleVisibility?: (id: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  state, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText
+  state, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText, onDuplicate, onDeleteLayer, onToggleVisibility
 }) => {
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
   const selectedText = selectedPage?.textObjects.find(t => t.id === state.selectedTextId);
+  const selectedMask = selectedPage?.masks?.find(m => m.id === state.selectedMaskId);
   const activeStyle = (selectedPage?.isLocalStyle && selectedPage.localStyle) ? selectedPage.localStyle : state.globalStyle;
   const activeImportMode = (selectedPage?.isLocalStyle && selectedPage.importMode) ? selectedPage.importMode : state.importMode;
 
@@ -212,9 +217,71 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <textarea value={selectedText.originalText} onChange={(e) => onUpdateText(selectedPage.id, selectedText.id, { originalText: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-xs h-24 outline-none focus:ring-1 focus:ring-blue-500" />
               </div>
             )}
+          {/* Opacity Slider for Masks */}
+            {selectedMask && (
+              <div className="mt-4 p-2 bg-slate-800 rounded border border-slate-700">
+                <div className="flex justify-between text-[9px] text-slate-400 mb-1 uppercase font-bold">
+                  <span>Mask Opacity</span>
+                  <span>{Math.round((selectedMask.opacity ?? 1) * 100)}%</span>
+                </div>
+                <input type="range" min="0" max="1" step="0.05" value={selectedMask.opacity ?? 1} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })} className="w-full accent-blue-500 h-1.5" />
+              </div>
+            )}
           </section>
         )}
       </div>
+
+      {/* LAYER MANAGER (Photoshop Style) */}
+      {selectedPage && (
+        <div className="mx-6 mb-6 p-4 bg-slate-900/80 border border-slate-800 rounded-xl flex flex-col h-[320px]">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Layers</h3>
+            <button onClick={onDuplicate} className="text-[9px] bg-slate-800 hover:bg-blue-600 px-2 py-1 rounded border border-slate-700 text-white font-bold transition-all">Duplicate</button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+            {/* Group: Dialogues */}
+            <div>
+              <div className="text-[9px] text-slate-500 mb-1.5 font-bold uppercase pl-1">Dialogues</div>
+              <div className="space-y-1">
+                {selectedPage.textObjects.map((layer) => (
+                  <div key={layer.id} className={`flex items-center gap-2 p-1.5 rounded transition-all group ${state.selectedTextId === layer.id ? 'bg-blue-600/30 border border-blue-500/50' : 'bg-slate-950/50 hover:bg-slate-800'}`}>
+                    <button onClick={() => onToggleVisibility?.(layer.id)} className={`p-1 ${layer.visible !== false ? 'text-blue-400' : 'text-slate-600'}`}>
+                       <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    </button>
+                    <div onClick={() => setState(p => ({ ...p, selectedTextId: layer.id, selectedMaskId: null }))} className="flex-1 truncate text-[10px] cursor-pointer text-slate-300">
+                      {layer.originalText.substring(0, 20)}...
+                    </div>
+                    <button onClick={() => onDeleteLayer?.(layer.id)} className="p-1 text-slate-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Group: Masks */}
+            <div className="pt-2 border-t border-slate-800">
+              <div className="text-[9px] text-slate-500 mb-1.5 font-bold uppercase pl-1">Masks & Buckets</div>
+              <div className="space-y-1">
+                {(selectedPage.masks || []).map((layer) => (
+                  <div key={layer.id} className={`flex items-center gap-2 p-1.5 rounded transition-all group ${state.selectedMaskId === layer.id ? 'bg-blue-600/30 border border-blue-500/50' : 'bg-slate-950/50 hover:bg-slate-800'}`}>
+                    <button onClick={() => onToggleVisibility?.(layer.id)} className={`p-1 ${layer.visible !== false ? 'text-blue-400' : 'text-slate-600'}`}>
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    </button>
+                    <div onClick={() => setState(p => ({ ...p, selectedMaskId: layer.id, selectedTextId: null }))} className="flex-1 truncate text-[10px] cursor-pointer text-slate-300">
+                      {layer.type === 'image' ? 'Smart Mask' : 'Manual Mask'}
+                    </div>
+                    <button onClick={() => onDeleteLayer?.(layer.id)} className="p-1 text-slate-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold bg-slate-950">v2.1.2 Pro</div>
     </aside>
   );

@@ -44,6 +44,7 @@ export interface TextObject extends TextStyle {
   x: number; 
   y: number; 
   width: number; 
+  visible?: boolean;
 }
 
 export interface MaskObject {
@@ -53,8 +54,10 @@ export interface MaskObject {
   width: number;
   height: number;
   fill: string;
-type?: 'rect' | 'image'; // Fix: Tambah properti ini
-  maskDataUrl?: string;    // Fix: Tambah properti ini
+type?: 'rect' | 'image';
+  maskDataUrl?: string;
+  opacity?: number;  // Fitur Baru: Opacity Setting
+  visible?: boolean; // Fitur Baru: Support Hide/Show
 }
 
 export interface SavedStyle {

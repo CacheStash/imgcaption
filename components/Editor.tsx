@@ -167,13 +167,21 @@ const Editor: React.FC<EditorProps> = ({
         const bW = bg ? bg.width * bg.scaleX : 1; 
         const bH = bg ? bg.height * bg.scaleY : 1;
         if (obj.data.type === 'text') {
-          callbacks.current.onUpdateText(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX });
+          // FIX: Hitung lebar visual baru (lebar asli dikali skala tarikan mouse)
+          const newWidth = obj.width * obj.scaleX;
+          callbacks.current.onUpdateText(obj.data.id, { 
+            x: (obj.left/bW)*100, 
+            y: (obj.top/bH)*100, 
+            width: newWidth 
+          });
+          // Reset skala agar Fabric merender ulang wrapping teks dengan lebar baru tersebut
+          obj.set({ scaleX: 1, scaleY: 1, width: newWidth });
         } else if (obj.data.type === 'mask') {
           callbacks.current.onUpdateMask(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX, height: obj.height*obj.scaleY });
         }
       }
     });
-
+    
     return () => fCanvas.dispose();
   }, [page.id]);
 
@@ -242,6 +250,8 @@ const Editor: React.FC<EditorProps> = ({
         width: textWidth,
         fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
         originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, 
+        visible: obj.visible !== false, // Mendukung Hide/Show
+        scaleX: 1, scaleY: 1, // Pastikan skala selalu 1 untuk mencegah ramping
         stroke: obj.outlineColor, strokeWidth: obj.outlineWidth,
         paintFirst: 'stroke', strokeLineJoin: 'round',
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 

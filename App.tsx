@@ -63,7 +63,58 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, pages: next }));
   }, [history, state.pages]);
 
-  // FIX: Delete Key untuk Teks DAN Mask
+  // FITUR: Hapus Layer Spesifik (untuk Layer Manager)
+  const deleteObjectById = useCallback((id: string) => {
+    if (!state.selectedPageId) return;
+    recordHistory();
+    setState(prev => ({
+      ...prev,
+      selectedTextId: prev.selectedTextId === id ? null : prev.selectedTextId,
+      selectedMaskId: prev.selectedMaskId === id ? null : prev.selectedMaskId,
+      pages: prev.pages.map(p => p.id === prev.selectedPageId ? {
+        ...p,
+        textObjects: p.textObjects.filter(t => t.id !== id),
+        masks: (p.masks || []).filter(m => m.id !== id)
+      } : p)
+    }));
+  }, [state.selectedPageId, recordHistory]);
+
+  // FITUR: Visibility Toggle (Eye Button)
+  const toggleObjectVisibility = useCallback((id: string) => {
+    if (!state.selectedPageId) return;
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === prev.selectedPageId ? {
+        ...p,
+        textObjects: p.textObjects.map(t => t.id === id ? { ...t, visible: t.visible === false } : t),
+        masks: (p.masks || []).map(m => m.id === id ? { ...m, visible: m.visible === false } : m)
+      } : p)
+    }));
+  }, [state.selectedPageId]);
+
+  // FITUR: Duplikasi Layer
+  const duplicateSelectedElement = useCallback(() => {
+    if (!selectedPage) return;
+    const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
+    const maskObj = selectedPage.masks?.find(m => m.id === state.selectedMaskId);
+    
+    if (!textObj && !maskObj) return;
+    recordHistory();
+
+    const newId = generateId();
+    setState(prev => ({
+      ...prev,
+      selectedTextId: textObj ? newId : prev.selectedTextId,
+      selectedMaskId: maskObj ? newId : prev.selectedMaskId,
+      pages: prev.pages.map(p => p.id === selectedPage.id ? {
+        ...p,
+        textObjects: textObj ? [...p.textObjects, { ...textObj, id: newId, x: textObj.x + 5, y: textObj.y + 5 }] : p.textObjects,
+        masks: maskObj ? [...(p.masks || []), { ...maskObj, id: newId, x: maskObj.x + 5, y: maskObj.y + 5 }] : p.masks
+      } : p)
+    }));
+  }, [selectedPage, state.selectedTextId, state.selectedMaskId, recordHistory]);
+
+  // FIX: Delete Key (Surgical Fix)
   const deleteSelectedElement = useCallback(() => {
     if (!state.selectedPageId) return;
     if (!state.selectedTextId && !state.selectedMaskId) return;
@@ -79,6 +130,7 @@ const App: React.FC = () => {
         } : p)
     }));
   }, [state.selectedPageId, state.selectedTextId, state.selectedMaskId, recordHistory]);
+
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -156,37 +208,32 @@ const App: React.FC = () => {
     });
   }, [recordHistory]);
 
-// FITUR 1: Split Text Logic
+  // FIX: Fungsi split diletakkan mandiri (tidak di dalam addTextManually)
   const splitSelectedText = useCallback(() => {
     if (!selectedPage || !state.selectedTextId) return;
     const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
     if (!textObj) return;
 
-    // Pecah berdasarkan baris baru
-    const lines = textObj.originalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length <= 1) return; // Tidak perlu split jika cuma 1 baris
+    // Logika Pecah Box: Pisahkan berdasarkan tanda koma ( , ) atau baris baru
+    const parts = textObj.originalText.split(/ , /).map(p => p.trim()).filter(p => p.length > 0);
+    const lines = parts.length > 1 ? parts : textObj.originalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    if (lines.length <= 1) return; 
 
     recordHistory();
-    
-    // Buat objek baru
     const newObjects: TextObject[] = lines.map((line, idx) => ({
       ...textObj,
       id: generateId(),
       originalText: line,
-      // Geser posisi Y sedikit ke bawah untuk setiap baris agar tidak menumpuk parah
-      y: Math.min(95, textObj.y + (idx * 5)), 
-      height: undefined // Reset height agar auto-fit
+      y: Math.min(95, textObj.y + (idx * 3)),
+      height: undefined 
     } as TextObject));
 
     setState(prev => ({
       ...prev,
-      selectedTextId: null, // Deselect
       pages: prev.pages.map(p => p.id === selectedPage.id ? {
         ...p,
-        textObjects: [
-          ...p.textObjects.filter(t => t.id !== textObj.id), // Hapus yg lama
-          ...newObjects // Masukkan pecahan baru
-        ]
+        textObjects: [...p.textObjects.filter(t => t.id !== textObj.id), ...newObjects]
       } : p)
     }));
   }, [selectedPage, state.selectedTextId, recordHistory]);
