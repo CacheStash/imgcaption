@@ -433,23 +433,30 @@ const App: React.FC = () => {
           const fObj = new fabric.Textbox(content, { 
             width: fWidth, fontSize: obj.fontSize*scale, fill: obj.color, 
             textAlign: 'center', originX: 'center', originY: 'center', 
-            fontWeight: obj.fontWeight || 'normal', // FIX: Terapkan Bold di Export
+            fontWeight: obj.fontWeight || 'normal',
             stroke: obj.outlineColor, strokeWidth: obj.outlineWidth*scale, 
             fontFamily: obj.fontFamily || 'Inter', strokeUniform: true, paintFirst: 'stroke', 
             shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur*scale, opacity: obj.glowOpacity }) 
           });
           
           fObj.setCoords();
-          const h = fObj.height;
-          // Pastikan posisi tidak keluar dari batas gambar (Clamping)
-          const minX = (obj.paddingLeft * scale) + (fWidth / 2);
-          const maxX = oW - (obj.paddingRight * scale) - (fWidth / 2);
-          const minY = (obj.paddingTop * scale) + (h / 2);
-          const maxY = oH - (obj.paddingBottom * scale) - (h / 2);
+          
+          // SINKRONISASI POSISI DENGAN EDITOR
+          const posX = (obj.x / 100) * oW;
+          const posY = (obj.y / 100) * oH;
+          
+          // Logika Clamping (Hanya Y untuk mencegah nabrak bawah, sesuai Editor)
+          const halfH = fObj.height / 2;
+          const maxTop = oH - (obj.paddingBottom * scale) - halfH;
+          const minTop = (obj.paddingTop * scale) + halfH;
+          
+          let safeTop = posY;
+          if (safeTop > maxTop) safeTop = maxTop;
+          if (safeTop < minTop) safeTop = minTop;
           
           fObj.set({ 
-            left: Math.max(minX, Math.min(maxX, (obj.x/100)*oW)), 
-            top: Math.max(minY, Math.min(maxY, (obj.y/100)*oH)) 
+            left: posX, 
+            top: safeTop 
           });
           staticCanvas.add(fObj);
         });
