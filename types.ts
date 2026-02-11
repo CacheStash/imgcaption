@@ -36,6 +36,7 @@ export interface AppState {
   globalStyle: TextStyle;
   savedStyles: SavedStyle[];
   isSmartFillMode?: boolean; // Fitur Baru: Toggle mode paint bucket
+  
 }
 
 export interface TextObject extends TextStyle {
@@ -44,7 +45,7 @@ export interface TextObject extends TextStyle {
   x: number; 
   y: number; 
   width: number; 
-  visible?: boolean;
+  visible?: boolean; // PENTING: Untuk fitur Hide/Show Layer
 }
 
 export interface MaskObject {
@@ -54,10 +55,10 @@ export interface MaskObject {
   width: number;
   height: number;
   fill: string;
-type?: 'rect' | 'image';
+  type?: 'rect' | 'image';
   maskDataUrl?: string;
-  opacity?: number;  // Fitur Baru: Opacity Setting
-  visible?: boolean; // Fitur Baru: Support Hide/Show
+  opacity?: number;  
+  visible?: boolean; // PENTING: Untuk fitur Hide/Show Layer
 }
 
 export interface SavedStyle {
@@ -87,5 +88,5 @@ export interface AppState {
   isGalleryView: boolean;
   globalStyle: TextStyle;
   savedStyles: SavedStyle[];
-  isSmartFillMode?: boolean; // Fix: Tambah properti ini
+  isSmartFillMode?: boolean; 
 }

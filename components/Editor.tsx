@@ -181,7 +181,7 @@ const Editor: React.FC<EditorProps> = ({
         }
       }
     });
-    
+
     return () => fCanvas.dispose();
   }, [page.id]);
 
@@ -240,18 +240,20 @@ const Editor: React.FC<EditorProps> = ({
       const posY = (obj.y / 100) * containerSize.height;
       
       // FIX 2: SINKRONISASI LEBAR & PADDING (Sama dengan Logika Download)
-      // Mengubah -80 menjadi -40 supaya box lebih lebar (tidak ramping/tinggi)
       const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
-      const baseWidth = importMode === 'full' ? containerSize.width - 40 : obj.width;
-      const textWidth = Math.max(50, baseWidth - horizontalPadding);
+      
+      // FIX: Gunakan obj.width state secara langsung untuk mode Box agar tidak "ngeyel" menciut
+      const textWidth = importMode === 'full' 
+        ? Math.max(50, containerSize.width - 40 - horizontalPadding) 
+        : obj.width;
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
         width: textWidth,
         fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
         originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, 
-        visible: obj.visible !== false, // Mendukung Hide/Show
-        scaleX: 1, scaleY: 1, // Pastikan skala selalu 1 untuk mencegah ramping
+        visible: obj.visible !== false, 
+        scaleX: 1, scaleY: 1, // Pastikan skala selalu 1 untuk mencegah bug ramping
         stroke: obj.outlineColor, strokeWidth: obj.outlineWidth,
         paintFirst: 'stroke', strokeLineJoin: 'round',
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
