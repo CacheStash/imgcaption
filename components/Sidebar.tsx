@@ -73,8 +73,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   const activeImportMode = (selectedPage?.isLocalStyle && selectedPage.importMode) ? selectedPage.importMode : state.importMode;
 
   const updateActiveStyle = (updates: Partial<TextStyle>) => {
-    onUpdateGlobalStyle({ ...activeStyle, ...updates });
+    // Jika ada teks yang diseleksi, update hanya objek tersebut
+    if (selectedText && selectedPage) {
+      onUpdateText(selectedPage.id, selectedText.id, updates);
+    } else {
+      // Jika tidak ada seleksi, update style Global/Local (sebagai default objek baru)
+      onUpdateGlobalStyle({ ...activeStyle, ...updates });
+    }
   };
+
+  // Tentukan style mana yang ditampilkan di UI: Milik objek terpilih atau Global/Local
+  const styleToDisplay = (selectedText && !state.isGalleryView) ? (selectedText as TextStyle) : activeStyle;
 
   const setImportMode = (mode: ImportMode) => {
     if (selectedPage?.isLocalStyle) {
@@ -261,7 +270,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* GROUP 3: STYLE SETTINGS */}
         <SectionPanel title={selectedPage?.isLocalStyle ? 'Local Style Settings' : 'Global Style Settings'} isOpen={openSections.style} onToggle={() => toggle('style')}>
           <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
-            {renderStyleEditor(activeStyle)}
+            {renderStyleEditor(styleToDisplay)}
           </div>
         </SectionPanel>
 
