@@ -319,18 +319,7 @@ const Editor: React.FC<EditorProps> = ({
         fObj = newTxt;
       } else if (!fObj.isEditing) {
         fObj.set({ ...tProps, left: calculatedX, top: calculatedY });
-        
-        // 3. LOGIKA "SEMEPET MUNGKIN" (Tight Fit)
-        if (importMode !== 'full') {
-          let maxLineW = 0;
-          for (let i = 0; i < fObj._textLines.length; i++) {
-            maxLineW = Math.max(maxLineW, fObj.getLineWidth(i));
-          }
-          if (maxLineW > 0) {
-            fObj.set({ width: maxLineW + 2 }); 
-          }
-        }
-        fObj.setCoords();
+        fObj.setCoords(); 
       }
       
       });
