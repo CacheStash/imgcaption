@@ -168,14 +168,25 @@ const Editor: React.FC<EditorProps> = ({
         const bH = bg ? bg.height * bg.scaleY : 1;
         if (obj.data.type === 'text') {
           // FIX: Hitung lebar visual baru (lebar asli dikali skala tarikan mouse)
+          // Menghitung font size baru berdasarkan skala saat ditarik dari sudut
+          const newFontSize = Math.round(obj.fontSize * obj.scaleX);
           const newWidth = obj.width * obj.scaleX;
+          
           callbacks.current.onUpdateText(obj.data.id, { 
             x: (obj.left/bW)*100, 
             y: (obj.top/bH)*100, 
-            width: newWidth 
+            width: newWidth,
+            fontSize: newFontSize
           });
-          // Reset skala agar Fabric merender ulang wrapping teks dengan lebar baru tersebut
-          obj.set({ scaleX: 1, scaleY: 1, width: newWidth });
+
+          // Update objek Fabric secara langsung agar sinkron tanpa kedip
+          // Reset skala ke 1 dan terapkan fontSize/width baru secara native
+          obj.set({ 
+            scaleX: 1, 
+            scaleY: 1, 
+            width: newWidth, 
+            fontSize: newFontSize 
+          });
         } else if (obj.data.type === 'mask') {
           callbacks.current.onUpdateMask(obj.data.id, { x: (obj.left/bW)*100, y: (obj.top/bH)*100, width: obj.width*obj.scaleX, height: obj.height*obj.scaleY });
         }
