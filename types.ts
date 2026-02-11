@@ -23,7 +23,9 @@ export interface TextStyle {
   fontFamily: string;
   type?: 'rect' | 'image'; // Fitur Baru: Membedakan kotak manual vs smart fill
   maskDataUrl?: string;    // Fitur Baru: Menyimpan gambar hasil paint bucket
+  
 }
+
 
 export interface AppState {
   pages: Page[];
@@ -55,6 +57,7 @@ export interface MaskObject {
   fill: string;
 type?: 'rect' | 'image'; // Fix: Tambah properti ini
   maskDataUrl?: string;    // Fix: Tambah properti ini
+  opacity?: number;
 }
 
 export interface SavedStyle {

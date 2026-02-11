@@ -24,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
   const selectedText = selectedPage?.textObjects.find(t => t.id === state.selectedTextId);
+  const selectedMask = selectedPage?.masks?.find(m => m.id === state.selectedMaskId); // Cari mask aktif
   const activeStyle = (selectedPage?.isLocalStyle && selectedPage.localStyle) ? selectedPage.localStyle : state.globalStyle;
   const activeImportMode = (selectedPage?.isLocalStyle && selectedPage.importMode) ? selectedPage.importMode : state.importMode;
 
@@ -199,13 +200,48 @@ const Sidebar: React.FC<SidebarProps> = ({
                className={`w-full mt-2 py-2 border rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-pink-500 hover:text-pink-500'}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-              {state.isSmartFillMode ? 'CLICK ON BUBBLE TO FILL...' : 'Smart Bucket (Auto Fill)'}
+              {state.isSmartFillMode ? 'CLICK IMAGE TO FILL...' : 'Smart Bucket (Auto Fill)'}
             </button>
+
+            {/* PANEL: Mask Settings (Opacity & Delete) */}
+            {selectedMask && (
+              <div className="mt-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
+                <h4 className="text-[10px] text-slate-400 font-bold uppercase mb-2">Mask Settings</h4>
+                <div className="mb-2">
+                  <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                    <span>Opacity</span>
+                    <span>{Math.round((selectedMask.opacity ?? 1) * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max="1" step="0.05" 
+                    value={selectedMask.opacity ?? 1} 
+                    onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })}
+                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  />
+                </div>
+                {/* Tampilkan Color Picker hanya jika bukan Image Mask */}
+                {selectedMask.type !== 'image' && (
+                  <div className="mb-2">
+                     <label className="block text-[10px] text-slate-400 mb-1">Color</label>
+                     <input type="color" value={selectedMask.fill} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { fill: e.target.value })} className="w-full h-6 rounded bg-slate-900 border border-slate-700" />
+                  </div>
+                )}
+                <button 
+                  onClick={() => {
+                    const event = new KeyboardEvent('keydown', { key: 'Delete' });
+                    window.dispatchEvent(event);
+                  }}
+                  className="w-full py-1 bg-red-900/50 hover:bg-red-900 text-red-200 rounded text-[10px] border border-red-800"
+                >
+                  Delete Mask
+                </button>
+              </div>
+            )}
 
             {selectedText && (
               <div className="mt-4 space-y-3">
-                {/* FITUR 1: Split Button */}
-                <button onClick={onSplitText} className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold flex items-center justify-center gap-1">
+                 {/* BUTTON: Split Text */}
+                 <button onClick={onSplitText} className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold flex items-center justify-center gap-1">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                   Split into Lines (Break Box)
                 </button>

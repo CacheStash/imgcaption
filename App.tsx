@@ -36,8 +36,7 @@ const App: React.FC = () => {
     return initial;
   });
 
-  const selectedPage = useMemo(() => state.pages.find(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
-  const currentPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
+  const selectedPage = useMemo(() => state.pages.find(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);const currentPageIndex = useMemo(() => state.pages.findIndex(p => p.id === state.selectedPageId), [state.pages, state.selectedPageId]);
 
   // FIX: Kalkulasi Mode Efektif (Local vs Global) untuk dikirim ke Editor
   const effectiveImportMode = useMemo(() => {
@@ -156,48 +155,50 @@ const App: React.FC = () => {
     });
   }, [recordHistory]);
 
-// FITUR 1: Split Text Logic
+// FITUR 1: Split Text (Fix Duplikasi)
   const splitSelectedText = useCallback(() => {
     if (!selectedPage || !state.selectedTextId) return;
     const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
     if (!textObj) return;
 
-    // Pecah berdasarkan baris baru
     const lines = textObj.originalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length <= 1) return; // Tidak perlu split jika cuma 1 baris
+    if (lines.length <= 1) return;
 
     recordHistory();
     
-    // Buat objek baru
+    // Buat array objek baru
     const newObjects: TextObject[] = lines.map((line, idx) => ({
       ...textObj,
       id: generateId(),
       originalText: line,
-      // Geser posisi Y sedikit ke bawah untuk setiap baris agar tidak menumpuk parah
-      y: Math.min(95, textObj.y + (idx * 5)), 
-      height: undefined // Reset height agar auto-fit
+      y: Math.min(95, textObj.y + (idx * 5)), // Geser ke bawah sedikit per baris
+      height: undefined
     } as TextObject));
 
     setState(prev => ({
       ...prev,
-      selectedTextId: null, // Deselect
+      selectedTextId: null,
       pages: prev.pages.map(p => p.id === selectedPage.id ? {
         ...p,
         textObjects: [
-          ...p.textObjects.filter(t => t.id !== textObj.id), // Hapus yg lama
-          ...newObjects // Masukkan pecahan baru
+          // PENTING: Filter/Hapus ID lama sebelum memasukkan yang baru
+          ...p.textObjects.filter(t => t.id !== textObj.id), 
+          ...newObjects 
         ]
       } : p)
     }));
   }, [selectedPage, state.selectedTextId, recordHistory]);
 
-  // FITUR 3: Handler Tambah Masker Pintar (Smart Bucket)
+  // FITUR 2: Smart Bucket Handler
   const addSmartMask = useCallback((pageId: string, maskData: MaskObject) => {
     recordHistory();
+    // Set opacity default 0.9 agar user bisa melihat sedikit teks asli utk positioning
+    const finalMask = { ...maskData, opacity: 0.9 };
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), maskData] } : p),
-      isSmartFillMode: false // Matikan mode setelah selesai fill
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), finalMask] } : p),
+      isSmartFillMode: false,
+      selectedMaskId: maskData.id // Auto select agar slider opacity muncul
     }));
   }, [recordHistory]);
 
@@ -435,8 +436,8 @@ const App: React.FC = () => {
                     onSelectText={id => setState(p => ({ ...p, selectedTextId: id, selectedMaskId: null }))}
                     onSelectMask={id => setState(p => ({ ...p, selectedMaskId: id, selectedTextId: null }))}
                     onRecordHistory={recordHistory} onResize={setPreviewWidth} 
-                    isSmartFill={state.isSmartFillMode} // Prop baru
-                    onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)} // Prop baru
+                    isSmartFill={state.isSmartFillMode} 
+                    onAddSmartMask={(m) => addSmartMask(selectedPage.id, m)}// Prop baru
                   />
                 )}
               </div>
