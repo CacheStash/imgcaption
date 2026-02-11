@@ -269,23 +269,15 @@ const Editor: React.FC<EditorProps> = ({
       // FIX 2: SINKRONISASI LEBAR & PADDING (Sama dengan Logika Download)
       const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
       
-      // 1. RESET LOGIKA POSITIONING (SNAPPING)
-      // L/C/R untuk Horizontal (X) | T/M/B untuk Vertical (Y)
-      // 1. LOGIKA SNAPPING & PADDING (JARAK BOX KE BATAS HALAMAN)
+      // 1. LOGIKA POSITIONING (UNLOCKED)
+      // Gunakan posX dan posY secara langsung agar box bisa digeser bebas.
+      // Posisi snapping (L/C/R dan T/M/B) tetap bekerja sebagai titik jangkar (originX/Y).
       let calculatedX = posX;
       let calculatedY = posY;
 
-      // Snapping Horizontal (X) + Offset Padding Halaman
-      if (obj.alignment === 'left') calculatedX = (obj.paddingLeft || 0);
-      else if (obj.alignment === 'right') calculatedX = containerSize.width - (obj.paddingRight || 0);
-      else if (obj.alignment === 'center') calculatedX = containerSize.width / 2;
-
-      // Snapping Vertical (Y) + Offset Padding Halaman
-      if (obj.verticalAlignment === 'top') calculatedY = (obj.paddingTop || 0);
-      else if (obj.verticalAlignment === 'bottom') calculatedY = containerSize.height - (obj.paddingBottom || 0);
-      else if (obj.verticalAlignment === 'middle') calculatedY = containerSize.height / 2;
-
-      // 2. LEBAR BOX (Mode Full vs Mode Box)
+      // 2. STABLE SIZE (NO AUTO-RESIZE)
+      // Lebar box mengikuti obj.width dari state tanpa dipaksa menciut otomatis.
+      // Ini memastikan ukuran box per baris (hasil split) tetap unik.
       const textWidth = importMode === 'full' 
         ? Math.max(50, containerSize.width - (obj.paddingLeft || 0) - (obj.paddingRight || 0)) 
         : obj.width;
@@ -310,7 +302,7 @@ const Editor: React.FC<EditorProps> = ({
         paintFirst: 'stroke', 
         strokeLineJoin: 'round',
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }),
-        padding: 0 // Reset internal padding Fabric agar box mepet ke teks
+        padding: 0 
       };
 
       if (!fObj) {
