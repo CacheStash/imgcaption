@@ -14,6 +14,7 @@ export interface TextStyle {
   boxShape?: BoxShape;
   alignment: Alignment; 
   verticalAlignment: VerticalAlignment; 
+  textAlign: Alignment; // Baru: Untuk mengatur alur paragraf di dalam box (Left/Center/Right)
   outlineColor: string;
   outlineWidth: number;
   glowColor: string;

@@ -153,15 +153,22 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="flex flex-col">
-        <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Alignment</label>
+        <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Box Position / Snapping</label>
         <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden mb-1">
           {(['left', 'center', 'right'] as Alignment[]).map((align) => (
             <button key={align} onClick={() => updateActiveStyle({ alignment: align })} className={`flex-1 text-[10px] uppercase font-bold ${style.alignment === align ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{align[0]}</button>
           ))}
         </div>
-        <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden">
+        <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden mb-3">
           {(['top', 'middle', 'bottom'] as VerticalAlignment[]).map((vAlign) => (
             <button key={vAlign} onClick={() => updateActiveStyle({ verticalAlignment: vAlign })} className={`flex-1 text-[10px] uppercase font-bold ${style.verticalAlignment === vAlign ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{vAlign[0]}</button>
+          ))}
+        </div>
+
+        <label className="block text-[10px] text-slate-500 mb-1 font-bold uppercase">Paragraph Align (Inside Box)</label>
+        <div className="flex bg-slate-900 border border-slate-700 rounded h-8 overflow-hidden">
+          {(['left', 'center', 'right'] as Alignment[]).map((align) => (
+            <button key={align} onClick={() => updateActiveStyle({ textAlign: align })} className={`flex-1 text-[10px] uppercase font-bold ${style.textAlign === align ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{align[0]}</button>
           ))}
         </div>
       </div>

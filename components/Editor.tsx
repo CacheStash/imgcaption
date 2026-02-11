@@ -279,9 +279,9 @@ const Editor: React.FC<EditorProps> = ({
         width: textWidth,
         fontSize: obj.fontSize, 
         fill: obj.color, 
-        textAlign: obj.alignment || 'center', // Mengikuti state alignment dari sidebar
-        originX: 'center', 
-        originY: 'center', 
+        textAlign: obj.textAlign || 'center', // Paragraph Align (Inside Box)
+        originX: obj.alignment || 'center',   // Box Position H (Anchor Point)
+        originY: obj.verticalAlignment === 'middle' ? 'center' : (obj.verticalAlignment || 'center'), // Box Position V (Anchor Point)
         fontFamily: obj.fontFamily, 
         text: content, 
         fontWeight: obj.fontWeight || 'normal',
