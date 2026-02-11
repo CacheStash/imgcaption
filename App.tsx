@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle, ImportMode, MaskObject } from './types';
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
 import Sidebar from './components/Sidebar';
+
 import Gallery from './components/Gallery';
 import Editor from './components/Editor';
 import Uploader from './components/Uploader';
@@ -24,11 +25,12 @@ const App: React.FC = () => {
     const initial: AppState = {
       pages: [], hideLabels: false, importMode: 'box', selectedPageId: null,
       selectedTextId: null, selectedMaskId: null, isGalleryView: true, globalStyle: DEFAULT_STYLE, savedStyles: [],
+      isSmartFillMode: false // Default off
     };
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { ...initial, ...parsed, isGalleryView: true, selectedPageId: null };
+        return { ...initial, ...parsed, isGalleryView: true, selectedPageId: null, isSmartFillMode: false };
       } catch(e) { return initial; }
     }
     return initial;
@@ -152,6 +154,51 @@ const App: React.FC = () => {
         selectedTextId: null 
       };
     });
+  }, [recordHistory]);
+
+// FITUR 1: Split Text Logic
+  const splitSelectedText = useCallback(() => {
+    if (!selectedPage || !state.selectedTextId) return;
+    const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
+    if (!textObj) return;
+
+    // Pecah berdasarkan baris baru
+    const lines = textObj.originalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length <= 1) return; // Tidak perlu split jika cuma 1 baris
+
+    recordHistory();
+    
+    // Buat objek baru
+    const newObjects: TextObject[] = lines.map((line, idx) => ({
+      ...textObj,
+      id: generateId(),
+      originalText: line,
+      // Geser posisi Y sedikit ke bawah untuk setiap baris agar tidak menumpuk parah
+      y: Math.min(95, textObj.y + (idx * 5)), 
+      height: undefined // Reset height agar auto-fit
+    } as TextObject));
+
+    setState(prev => ({
+      ...prev,
+      selectedTextId: null, // Deselect
+      pages: prev.pages.map(p => p.id === selectedPage.id ? {
+        ...p,
+        textObjects: [
+          ...p.textObjects.filter(t => t.id !== textObj.id), // Hapus yg lama
+          ...newObjects // Masukkan pecahan baru
+        ]
+      } : p)
+    }));
+  }, [selectedPage, state.selectedTextId, recordHistory]);
+
+  // FITUR 3: Handler Tambah Masker Pintar (Smart Bucket)
+  const addSmartMask = useCallback((pageId: string, maskData: MaskObject) => {
+    recordHistory();
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), maskData] } : p),
+      isSmartFillMode: false // Matikan mode setelah selesai fill
+    }));
   }, [recordHistory]);
 
   // FIX: Handler Add Mask
@@ -346,6 +393,7 @@ const App: React.FC = () => {
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
+        onSplitText={splitSelectedText} // Pass fungsi split
       />
       <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
         {state.pages.length === 0 ? (
@@ -356,20 +404,22 @@ const App: React.FC = () => {
               <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={handleSelectPage} />
             ) : (
               <div className="h-full flex flex-col items-center">
+                {/* ... (kode navigasi navbar tetap sama) ... */}
                 <div className="mb-4 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextId: null }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
-                    <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                    <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-                    <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Next"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
-                    <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                    <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
-                    <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-                      </svg>
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-2">
+                         {/* ... tombol back, prev, next, undo, redo tetap sama ... */}
+                        <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextId: null }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
+                        <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
+                        <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+                        <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Next"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
+                        <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
+                        <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
+                        <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+                          </svg>
+                        </button>
+                    </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p>
@@ -385,6 +435,8 @@ const App: React.FC = () => {
                     onSelectText={id => setState(p => ({ ...p, selectedTextId: id, selectedMaskId: null }))}
                     onSelectMask={id => setState(p => ({ ...p, selectedMaskId: id, selectedTextId: null }))}
                     onRecordHistory={recordHistory} onResize={setPreviewWidth} 
+                    isSmartFill={state.isSmartFillMode} // Prop baru
+                    onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)} // Prop baru
                   />
                 )}
               </div>

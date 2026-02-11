@@ -21,6 +21,21 @@ export interface TextStyle {
   glowBlur: number;
   glowOpacity: number;
   fontFamily: string;
+  type?: 'rect' | 'image'; // Fitur Baru: Membedakan kotak manual vs smart fill
+  maskDataUrl?: string;    // Fitur Baru: Menyimpan gambar hasil paint bucket
+}
+
+export interface AppState {
+  pages: Page[];
+  hideLabels: boolean;
+  importMode: ImportMode;
+  selectedPageId: string | null;
+  selectedTextId: string | null;
+  selectedMaskId?: string | null;
+  isGalleryView: boolean;
+  globalStyle: TextStyle;
+  savedStyles: SavedStyle[];
+  isSmartFillMode?: boolean; // Fitur Baru: Toggle mode paint bucket
 }
 
 export interface TextObject extends TextStyle {
@@ -38,6 +53,8 @@ export interface MaskObject {
   width: number;
   height: number;
   fill: string;
+type?: 'rect' | 'image'; // Fix: Tambah properti ini
+  maskDataUrl?: string;    // Fix: Tambah properti ini
 }
 
 export interface SavedStyle {
@@ -67,4 +84,5 @@ export interface AppState {
   isGalleryView: boolean;
   globalStyle: TextStyle;
   savedStyles: SavedStyle[];
+  isSmartFillMode?: boolean; // Fix: Tambah properti ini
 }
