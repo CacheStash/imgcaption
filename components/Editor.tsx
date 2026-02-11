@@ -271,20 +271,23 @@ const Editor: React.FC<EditorProps> = ({
       
       // 1. RESET LOGIKA POSITIONING (SNAPPING)
       // L/C/R untuk Horizontal (X) | T/M/B untuk Vertical (Y)
+      // 1. LOGIKA SNAPPING & PADDING (JARAK BOX KE BATAS HALAMAN)
       let calculatedX = posX;
-      if (obj.alignment === 'left') calculatedX = (5 / 100) * containerSize.width;
-      else if (obj.alignment === 'center') calculatedX = containerSize.width / 2;
-      else if (obj.alignment === 'right') calculatedX = (95 / 100) * containerSize.width;
-
       let calculatedY = posY;
-      if (obj.verticalAlignment === 'top') calculatedY = (5 / 100) * containerSize.height;
-      else if (obj.verticalAlignment === 'middle') calculatedY = containerSize.height / 2;
-      else if (obj.verticalAlignment === 'bottom') calculatedY = (95 / 100) * containerSize.height;
 
-      // 2. LOGIKA TIGHT BOX & PADDING INTERNAL
-      // Lebar box tidak lagi dikurangi padding halaman agar tidak "lepas" dari teks
+      // Snapping Horizontal (X) + Offset Padding Halaman
+      if (obj.alignment === 'left') calculatedX = (obj.paddingLeft || 0);
+      else if (obj.alignment === 'right') calculatedX = containerSize.width - (obj.paddingRight || 0);
+      else if (obj.alignment === 'center') calculatedX = containerSize.width / 2;
+
+      // Snapping Vertical (Y) + Offset Padding Halaman
+      if (obj.verticalAlignment === 'top') calculatedY = (obj.paddingTop || 0);
+      else if (obj.verticalAlignment === 'bottom') calculatedY = containerSize.height - (obj.paddingBottom || 0);
+      else if (obj.verticalAlignment === 'middle') calculatedY = containerSize.height / 2;
+
+      // 2. LEBAR BOX (Mode Full vs Mode Box)
       const textWidth = importMode === 'full' 
-        ? Math.max(50, containerSize.width - 40) 
+        ? Math.max(50, containerSize.width - (obj.paddingLeft || 0) - (obj.paddingRight || 0)) 
         : obj.width;
 
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
@@ -292,11 +295,10 @@ const Editor: React.FC<EditorProps> = ({
         width: textWidth,
         fontSize: obj.fontSize, 
         fill: obj.color, 
-        textAlign: obj.textAlign || 'center', // Paragraf di dalam
-        originX: obj.alignment || 'center',   // Snapping H
-        originY: obj.verticalAlignment === 'middle' ? 'center' : (obj.verticalAlignment || 'center'), // Snapping V
+        textAlign: obj.textAlign || 'center', // Paragraph alignment di dalam box
+        originX: obj.alignment || 'center',   // Titik jangkar box untuk snapping H
+        originY: obj.verticalAlignment === 'middle' ? 'center' : (obj.verticalAlignment || 'center'), // Titik jangkar box untuk snapping V
         backgroundColor: obj.backgroundColor || 'transparent',
-        padding: obj.paddingLeft || 0, // Padding internal box
         fontFamily: obj.fontFamily, 
         text: content, 
         fontWeight: obj.fontWeight || 'normal',
@@ -307,7 +309,8 @@ const Editor: React.FC<EditorProps> = ({
         strokeWidth: obj.outlineWidth,
         paintFirst: 'stroke', 
         strokeLineJoin: 'round',
-        shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
+        shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }),
+        padding: 0 // Reset internal padding Fabric agar box mepet ke teks
       };
 
       if (!fObj) {
@@ -324,7 +327,7 @@ const Editor: React.FC<EditorProps> = ({
             maxLineW = Math.max(maxLineW, fObj.getLineWidth(i));
           }
           if (maxLineW > 0) {
-            fObj.set({ width: maxLineW + 2 }); // Mepet ke teks terlebar
+            fObj.set({ width: maxLineW + 2 }); 
           }
         }
         fObj.setCoords();
