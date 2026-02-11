@@ -269,21 +269,25 @@ const Editor: React.FC<EditorProps> = ({
       // FIX 2: SINKRONISASI LEBAR & PADDING (Sama dengan Logika Download)
       const horizontalPadding = (obj.paddingLeft || 0) + (obj.paddingRight || 0);
       
-      let calculatedX = posX;
-      let calculatedY = posY;
+      let finalX = posX;
+      let finalY = posY;
+      let originX = 'center';
+      let originY = 'center';
 
-      // Snapping Horizontal (X)
-      if (obj.alignment === 'left') calculatedX = (obj.paddingLeft || 0);
-      else if (obj.alignment === 'center') calculatedX = containerSize.width / 2;
-      else if (obj.alignment === 'right') calculatedX = containerSize.width - (obj.paddingRight || 0);
+      // Tentukan Posisi Horizontal & Anchor
+      if (obj.alignment === 'left') { finalX = (obj.paddingLeft || 0); originX = 'left'; }
+      else if (obj.alignment === 'right') { finalX = containerSize.width - (obj.paddingRight || 0); originX = 'right'; }
+      else if (obj.alignment === 'center') { finalX = containerSize.width / 2; originX = 'center'; }
+      else { originX = 'center'; } // Mode 'none'
 
-      // Snapping Vertical (Y)
-      if (obj.verticalAlignment === 'top') calculatedY = (obj.paddingTop || 0);
-      else if (obj.verticalAlignment === 'middle') calculatedY = containerSize.height / 2;
-      else if (obj.verticalAlignment === 'bottom') calculatedY = containerSize.height - (obj.paddingBottom || 0);
+      // Tentukan Posisi Vertikal & Anchor
+      if (obj.verticalAlignment === 'top') { finalY = (obj.paddingTop || 0); originY = 'top'; }
+      else if (obj.verticalAlignment === 'bottom') { finalY = containerSize.height - (obj.paddingBottom || 0); originY = 'bottom'; }
+      else if (obj.verticalAlignment === 'middle') { finalY = containerSize.height / 2; originY = 'center'; }
+      else { originY = 'center'; } // Mode 'none'
 
-      // 2. STABILITAS UKURAN (NO AUTO-RESIZE)
-      // Lebar text box tetap menggunakan obj.width (mode box) agar tidak berubah bentuk.
+      // 2. STABILITAS DIMENSI
+      // Gunakan obj.width asli agar tidak berubah ukuran saat snapping diganti
       const textWidth = importMode === 'full' 
         ? Math.max(50, containerSize.width - (obj.paddingLeft || 0) - (obj.paddingRight || 0)) 
         : obj.width;
@@ -293,9 +297,9 @@ const Editor: React.FC<EditorProps> = ({
         width: textWidth,
         fontSize: obj.fontSize, 
         fill: obj.color, 
-        textAlign: obj.textAlign || 'center', // Perataan paragraf di dalam box
-        originX: obj.alignment || 'center',   // Titik jangkar snapping H
-        originY: obj.verticalAlignment === 'middle' ? 'center' : (obj.verticalAlignment || 'center'), // Titik jangkar snapping V
+        textAlign: obj.textAlign || 'center', 
+        originX: originX,   
+        originY: originY, 
         backgroundColor: obj.backgroundColor || 'transparent',
         fontFamily: obj.fontFamily, 
         text: content, 
@@ -308,16 +312,16 @@ const Editor: React.FC<EditorProps> = ({
         paintFirst: 'stroke', 
         strokeLineJoin: 'round',
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }),
-        padding: 0 // Reset Fabric internal padding (Tight to content)
+        padding: 0 
       };
 
       if (!fObj) {
-        const newTxt = new fabric.Textbox(content, { ...tProps, left: calculatedX, top: calculatedY, data: { id: obj.id, type: 'text' } });
+        const newTxt = new fabric.Textbox(content, { ...tProps, left: finalX, top: finalY, data: { id: obj.id, type: 'text' } });
         fCanvas.add(newTxt);
         fObj = newTxt;
       } else if (!fObj.isEditing) {
-        // Update posisi dan jangkar tanpa merusak dimensi box
-        fObj.set({ ...tProps, left: calculatedX, top: calculatedY });
+        // Apply semua properti secara bersamaan agar tidak ada lonjakan visual
+        fObj.set({ ...tProps, left: finalX, top: finalY });
         fObj.setCoords(); 
       }
       
