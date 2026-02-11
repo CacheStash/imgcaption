@@ -282,12 +282,14 @@ const Editor: React.FC<EditorProps> = ({
         textAlign: obj.textAlign || 'center', // Paragraph Align (Inside Box)
         originX: obj.alignment || 'center',   // Box Position H (Anchor Point)
         originY: obj.verticalAlignment === 'middle' ? 'center' : (obj.verticalAlignment || 'center'), // Box Position V (Anchor Point)
+        backgroundColor: obj.backgroundColor || 'transparent', // Dialog Box Background
+        padding: obj.paddingLeft || 0, // Fabric menggunakan padding seragam (diambil dari paddingLeft)
         fontFamily: obj.fontFamily, 
         text: content, 
         fontWeight: obj.fontWeight || 'normal',
         visible: obj.visible !== false, 
         scaleX: 1, 
-        scaleY: 1, 
+        scaleY: 1,
         stroke: obj.outlineColor, 
         strokeWidth: obj.outlineWidth,
         paintFirst: 'stroke', 
@@ -301,6 +303,7 @@ const Editor: React.FC<EditorProps> = ({
         fObj = newTxt;
       } else if (!fObj.isEditing) {
         fObj.set({ ...tProps, left: posX, top: posY });
+        fObj.setCoords(); // Memastikan area seleksi dan bentuk tetap stabil setelah perubahan origin
       }
       });
     (page.masks || []).forEach((mask) => {
