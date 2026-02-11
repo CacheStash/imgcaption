@@ -1,6 +1,7 @@
-export type Alignment = 'left' | 'center' | 'right';
-export type VerticalAlignment = 'top' | 'middle' | 'bottom';
+export type Alignment = 'left' | 'center' | 'right' | 'none';
+export type VerticalAlignment = 'top' | 'middle' | 'bottom' | 'none';
 export type ImportMode = 'full' | 'box';
+
 export type BoxShape = 'none' | 'rect' | 'rounded' | 'oval'; 
 
 export interface TextStyle {
