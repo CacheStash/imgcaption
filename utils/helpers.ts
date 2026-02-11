@@ -12,7 +12,10 @@ export const FONT_OPTIONS = [
 
 export const cleanText = (text: string, hideLabels: boolean): string => {
   if (!hideLabels) return text.trim();
-  return text.replace(/^[^:]+:\s*/, '').trim();
+  // FIX: Regex untuk menghapus label "Nama:" di awal string, awal baris baru, atau setelah tanda koma
+  return text.replace(/(?:\r?\n|^|,\s*)[^:\n,]+:\s*/g, (match) => {
+    return match.startsWith(',') ? ', ' : '';
+  }).trim();
 };
 
 export const parseRawText = (text: string, mode: ImportMode = 'box'): Record<number, string[]> => {

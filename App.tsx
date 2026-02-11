@@ -377,32 +377,63 @@ const App: React.FC = () => {
     const tempCanvas = document.createElement('canvas');
     const staticCanvas = new fabric.StaticCanvas(tempCanvas);
     return new Promise<string>((resolve) => {
-      fabric.Image.fromURL(page.imageUrl, (img: any) => {
+      fabric.Image.fromURL(page.imageUrl, async (img: any) => {
         const oW = img.width; const oH = img.height;
         staticCanvas.setDimensions({ width: oW, height: oH });
         staticCanvas.setBackgroundImage(img, staticCanvas.renderAll.bind(staticCanvas));
         const scale = oW / previewWidth;
         
-        // FIX: Tentukan mode halaman untuk export
+        // Tentukan mode halaman untuk export
         const pageMode = page.isLocalStyle && page.importMode ? page.importMode : state.importMode;
 
-        // Draw Masks
-        (page.masks || []).forEach(m => {
+        // Render Masker (Manual & Smart Fill)
+        const maskPromises = (page.masks || []).map(m => {
+          if (m.visible === false) return Promise.resolve(); // Hormati fitur Hide
           
-          staticCanvas.add(new fabric.Rect({ 
-            left: (m.x/100)*oW, top: (m.y/100)*oH, 
-            width: m.width*scale, height: m.height*scale, 
-            fill: m.fill, originX: 'center', originY: 'center' 
-          }));
+          if (m.type === 'image' && m.maskDataUrl) {
+            // Render Smart Fill Image
+            return new Promise<void>((res) => {
+              fabric.Image.fromURL(m.maskDataUrl, (maskImg: any) => {
+                maskImg.set({ 
+                  left: 0, top: 0, scaleX: oW / maskImg.width, scaleY: oH / maskImg.height,
+                  opacity: m.opacity ?? 1
+                });
+                staticCanvas.add(maskImg);
+                staticCanvas.sendToBack(maskImg);
+                res();
+              }, { crossOrigin: 'anonymous' });
+            });
+          } else {
+            // Render Manual Shape (Rect / Oval)
+            const mProps = {
+              left: (m.x/100)*oW, top: (m.y/100)*oH, 
+              width: m.width*scale, height: m.height*scale, 
+              fill: m.fill, originX: 'center', originY: 'center',
+              opacity: m.opacity ?? 1,
+              stroke: m.stroke || '#000000',
+              strokeWidth: (m.strokeWidth || 0) * scale // Skala outline mengikuti gambar
+            };
+            const shapeObj = m.shape === 'oval' 
+              ? new fabric.Ellipse({ ...mProps, rx: mProps.width/2, ry: mProps.height/2 })
+              : new fabric.Rect(mProps);
+            staticCanvas.add(shapeObj);
+            staticCanvas.sendToBack(shapeObj);
+            return Promise.resolve();
+          }
         });
 
-        // Draw Text with Clamping
+        await Promise.all(maskPromises);
+
+        // Render Text Objects
         page.textObjects.forEach((obj) => {
+          if (obj.visible === false) return; // Hormati fitur Hide
           const content = cleanText(obj.originalText, state.hideLabels);
           const fWidth = pageMode === 'full' ? oW - ((obj.paddingLeft + obj.paddingRight + 40)*scale) : obj.width*scale;
+          
           const fObj = new fabric.Textbox(content, { 
             width: fWidth, fontSize: obj.fontSize*scale, fill: obj.color, 
             textAlign: 'center', originX: 'center', originY: 'center', 
+            fontWeight: obj.fontWeight || 'normal', // FIX: Terapkan Bold di Export
             stroke: obj.outlineColor, strokeWidth: obj.outlineWidth*scale, 
             fontFamily: obj.fontFamily || 'Inter', strokeUniform: true, paintFirst: 'stroke', 
             shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur*scale, opacity: obj.glowOpacity }) 
@@ -410,6 +441,7 @@ const App: React.FC = () => {
           
           fObj.setCoords();
           const h = fObj.height;
+          // Pastikan posisi tidak keluar dari batas gambar (Clamping)
           const minX = (obj.paddingLeft * scale) + (fWidth / 2);
           const maxX = oW - (obj.paddingRight * scale) - (fWidth / 2);
           const minY = (obj.paddingTop * scale) + (h / 2);
@@ -423,8 +455,11 @@ const App: React.FC = () => {
         });
         
         staticCanvas.renderAll();
-        resolve(staticCanvas.toDataURL({ format: 'jpeg', quality: 0.85 }));
-        staticCanvas.dispose();
+        // Beri jeda sedikit agar rendering browser selesai
+        setTimeout(() => {
+          resolve(staticCanvas.toDataURL({ format: 'jpeg', quality: 0.85 }));
+          staticCanvas.dispose();
+        }, 150);
       });
     });
   };
