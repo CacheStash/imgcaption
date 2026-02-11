@@ -203,7 +203,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               {state.isSmartFillMode ? 'CLICK IMAGE TO FILL...' : 'Smart Bucket (Auto Fill)'}
             </button>
 
-            {/* PANEL: Mask Settings (Opacity & Delete) */}
+            {/* PANEL 1: Mask Settings (Muncul jika Mask dipilih) */}
             {selectedMask && (
               <div className="mt-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <h4 className="text-[10px] text-slate-400 font-bold uppercase mb-2">Mask Settings</h4>
@@ -219,7 +219,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
                 </div>
-                {/* Tampilkan Color Picker hanya jika bukan Image Mask */}
                 {selectedMask.type !== 'image' && (
                   <div className="mb-2">
                      <label className="block text-[10px] text-slate-400 mb-1">Color</label>
@@ -238,12 +237,13 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
 
+            {/* PANEL 2: Text Box Settings (Sekarang diletakkan di bawah Mask Setting agar tidak hilang) */}
             {selectedText && (
-              <div className="mt-4 space-y-3">
-                 {/* BUTTON: Split Text */}
+              <div className="mt-4 space-y-3 pt-4 border-t border-slate-800">
+                 <h4 className="text-[10px] text-blue-400 font-bold uppercase">Text Editing</h4>
                  <button onClick={onSplitText} className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold flex items-center justify-center gap-1">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-                  Split into Lines (Break Box)
+                  Split / Break Box (Auto)
                 </button>
                 <textarea value={selectedText.originalText} onChange={(e) => onUpdateText(selectedPage.id, selectedText.id, { originalText: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-xs h-24 outline-none focus:ring-1 focus:ring-blue-500" />
               </div>

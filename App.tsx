@@ -161,44 +161,49 @@ const App: React.FC = () => {
     const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
     if (!textObj) return;
 
-    const lines = textObj.originalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    // Logika Pecah Box: Pisahkan berdasarkan tanda koma ( , )
+    // Regex ini memecah pada koma yang diikuti spasi, agar tidak memecah koma di dalam kalimat biasa jika memungkinkan
+    const parts = textObj.originalText.split(/ , /).map(p => p.trim()).filter(p => p.length > 0);
+    
+    // Jika tidak ada koma ' , ', coba pecah berdasarkan baris baru seperti sebelumnya sebagai cadangan
+    const lines = parts.length > 1 ? parts : textObj.originalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
     if (lines.length <= 1) return;
 
     recordHistory();
     
-    // Buat array objek baru
     const newObjects: TextObject[] = lines.map((line, idx) => ({
       ...textObj,
       id: generateId(),
       originalText: line,
-      y: Math.min(95, textObj.y + (idx * 5)), // Geser ke bawah sedikit per baris
+      // Sebar posisi sedikit agar tidak bertumpuk sempurna
+      y: Math.min(95, textObj.y + (idx * 3)), 
       height: undefined
     } as TextObject));
 
     setState(prev => ({
       ...prev,
-      selectedTextId: null,
+      // Jangan langsung null kan selectedTextId agar sidebar tidak kaget
       pages: prev.pages.map(p => p.id === selectedPage.id ? {
         ...p,
         textObjects: [
-          // PENTING: Filter/Hapus ID lama sebelum memasukkan yang baru
-          ...p.textObjects.filter(t => t.id !== textObj.id), 
+          ...p.textObjects.filter(t => t.id !== textObj.id), // Hapus yang lama
           ...newObjects 
         ]
       } : p)
     }));
   }, [selectedPage, state.selectedTextId, recordHistory]);
 
-  // FITUR 2: Smart Bucket Handler
+  // FITUR 2: Smart Bucket Handler (Jangan hilangkan pilihan teks)
   const addSmartMask = useCallback((pageId: string, maskData: MaskObject) => {
     recordHistory();
-    // Set opacity default 0.9 agar user bisa melihat sedikit teks asli utk positioning
     const finalMask = { ...maskData, opacity: 0.9 };
     setState(prev => ({
       ...prev,
       pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), finalMask] } : p),
       isSmartFillMode: false,
-      selectedMaskId: maskData.id // Auto select agar slider opacity muncul
+      selectedMaskId: maskData.id
+      // HAPUS: selectedTextId: null agar setting text tidak hilang
     }));
   }, [recordHistory]);
 

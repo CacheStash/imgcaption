@@ -54,7 +54,7 @@ const Editor: React.FC<EditorProps> = ({
     
     const startIndex = getIdx(Math.floor(startX), Math.floor(startY));
     const startR = data[startIndex], startG = data[startIndex+1], startB = data[startIndex+2];
-    const TOLERANCE = 40; 
+    const TOLERANCE = 25; // Turunkan dari 40 ke 25 agar tidak bocor keluar garis hitam
     
     // Canvas untuk Mask
     const maskCanvas = document.createElement('canvas');
@@ -88,15 +88,13 @@ const Editor: React.FC<EditorProps> = ({
       }
     }
 
-    // --- FITUR: DILATION (Mengisi Celah Kosong / Outline Teks) ---
-    // Mengembangkan area putih sebanyak 3 pixel untuk menutupi teks hitam di tengah bubble
+    // --- FITUR: DILATION (Radius diperkecil agar tidak makan outline) ---
     const applyDilation = (data: Uint8ClampedArray, w: number, h: number, radius: number) => {
-      const copy = new Uint8ClampedArray(data); // Copy original state
+      const copy = new Uint8ClampedArray(data); 
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const idx = (y * w + x) * 4;
-          if (copy[idx + 3] > 0) { // Jika pixel ini putih
-             // Warnai tetangganya putih juga
+          if (copy[idx + 3] > 0) { 
              for (let dy = -radius; dy <= radius; dy++) {
                for (let dx = -radius; dx <= radius; dx++) {
                  const ny = y + dy; const nx = x + dx;
@@ -111,7 +109,7 @@ const Editor: React.FC<EditorProps> = ({
       }
     };
 
-    applyDilation(maskData, width, height, 3); // Radius 3px cukup untuk teks komik standar
+    applyDilation(maskData, width, height, 1); // Kecilkan radius ke 1 atau 2 agar tidak menutupi outline dialog
 
     maskCtx.putImageData(maskImageData, 0, 0);
     
