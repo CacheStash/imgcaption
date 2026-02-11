@@ -45,7 +45,7 @@ export interface TextObject extends TextStyle {
   x: number; 
   y: number; 
   width: number; 
-  visible?: boolean; // PENTING: Untuk fitur Hide/Show Layer
+  visible?: boolean; 
 }
 
 export interface MaskObject {
@@ -58,7 +58,7 @@ export interface MaskObject {
   type?: 'rect' | 'image';
   maskDataUrl?: string;
   opacity?: number;  
-  visible?: boolean; // PENTING: Untuk fitur Hide/Show Layer
+  visible?: boolean; 
 }
 
 export interface SavedStyle {

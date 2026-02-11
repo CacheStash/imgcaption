@@ -118,6 +118,10 @@ const App: React.FC = () => {
   const deleteSelectedElement = useCallback(() => {
     if (!state.selectedPageId) return;
     if (!state.selectedTextId && !state.selectedMaskId) return;
+
+    const textIdToDelete = state.selectedTextId;
+    const maskIdToDelete = state.selectedMaskId;
+
     recordHistory();
     setState(prev => ({
       ...prev,
@@ -125,21 +129,26 @@ const App: React.FC = () => {
       selectedMaskId: null,
       pages: prev.pages.map(p => (p.id === prev.selectedPageId) ? { 
           ...p, 
-          textObjects: p.textObjects.filter(t => t.id !== prev.selectedTextId),
-          masks: (p.masks || []).filter(m => m.id !== prev.selectedMaskId)
+          textObjects: p.textObjects.filter(t => t.id !== textIdToDelete),
+          masks: (p.masks || []).filter(m => m.id !== maskIdToDelete)
         } : p)
     }));
   }, [state.selectedPageId, state.selectedTextId, state.selectedMaskId, recordHistory]);
-
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isTyping = ['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable;
       if (isTyping) return;
+      
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
-      if ((e.key === 'Delete' || e.key === 'Backspace')) { deleteSelectedElement(); }
+      
+      // FIX: Tambahkan preventDefault untuk Delete dan Backspace agar berfungsi maksimal
+      if (e.key === 'Delete' || e.key === 'Backspace') { 
+        e.preventDefault(); 
+        deleteSelectedElement(); 
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
