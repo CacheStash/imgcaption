@@ -258,22 +258,18 @@ const App: React.FC = () => {
   }, [recordHistory]);
 
   // FIX: Handler Add Mask
-  const addMaskManually = useCallback((pageId: string) => {
+  const addMaskManually = useCallback((pageId: string, shape: 'rect' | 'oval' = 'rect') => {
     recordHistory();
     const newMask: MaskObject = { 
       id: generateId(), x: 50, y: 50, width: 200, height: 100, 
-      fill: '#FFFFFF', shape: 'rect', stroke: '#000000', strokeWidth: 0 
-    };
-    // Menambahkan default properties untuk bentuk dan outline agar tidak undefined
-    const newMaskWithDefaults: MaskObject = { 
-      ...newMask, 
-      shape: 'rect', 
+      fill: '#FFFFFF', 
+      shape: shape, // FIX: Menggunakan parameter dari fungsi
       stroke: '#000000', 
       strokeWidth: 0 
     };
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), newMaskWithDefaults] } : p),
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), newMask] } : p),
       selectedTextId: null,
       selectedMaskId: newMask.id
     }));

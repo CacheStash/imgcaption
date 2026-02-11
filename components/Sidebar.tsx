@@ -8,7 +8,7 @@ interface SidebarProps {
   onTextImport: (text: string) => void;
   onUpdateText: (pageId: string, textId: string, updates: Partial<TextObject>) => void;
   onAddText: (pageId: string) => void;
-  onAddMask: (pageId: string) => void;
+onAddMask: (pageId: string, shape?: 'rect' | 'oval') => void; // Update parameter shape
   onUpdateMask: (pageId: string, maskId: string, updates: Partial<MaskObject>) => void;
   onClearAll: () => void;
   onUpdateGlobalStyle: (style: TextStyle) => void;
@@ -26,6 +26,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ 
   state, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText, onDuplicate, onDeleteLayer, onToggleVisibility
 }) => {
+
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
   const selectedText = selectedPage?.textObjects.find(t => t.id === state.selectedTextId);
   const selectedMask = selectedPage?.masks?.find(m => m.id === state.selectedMaskId);
@@ -203,10 +204,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           <section className="p-4 border border-slate-800 rounded-xl bg-slate-900/20">
             <button onClick={() => onAddText(selectedPage.id)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">+ Manual Text Box</button>
             
-            <button onClick={() => onAddMask(selectedPage.id)} className="w-full mt-2 py-2 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-xs font-bold hover:bg-slate-600 flex items-center justify-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
-              + Paint Bucket (Manual Box)
-            </button>
+            {/* Split Button: Square vs Oval */}
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <button onClick={() => onAddMask(selectedPage.id, 'rect')} className="py-2 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-600 flex items-center justify-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                + Square
+              </button>
+              <button onClick={() => onAddMask(selectedPage.id, 'oval')} className="py-2 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-600 flex items-center justify-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                + Oval
+              </button>
+            </div>
 
             {/* FITUR 3: Smart Bucket Toggle */}
             <button 

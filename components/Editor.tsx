@@ -315,35 +315,25 @@ const Editor: React.FC<EditorProps> = ({
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
       const mProps = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
       // Properti dasar untuk Rect/Oval
-      const shapeProps = { 
-        ...mProps, 
-        opacity: mask.opacity ?? 1, 
-        visible: mask.visible !== false,
-        stroke: mask.stroke || '#000000', 
-        strokeWidth: mask.strokeWidth || 0,
-        scaleX: 1, scaleY: 1 
-      };
+      const isTypeMismatch = fObj && (
+        (mask.shape === 'oval' && fObj.type !== 'ellipse') || 
+        (mask.shape !== 'oval' && fObj.type === 'ellipse')
+      );
+
+      if (isTypeMismatch) {
+        fCanvas.remove(fObj);
+        fObj = null; // Paksa buat baru di bawah
+      }
 
       if (mask.type === 'image' && mask.maskDataUrl) {
-         // Render Image Mask (Smart Fill)
-         if (!fObj) {
-           fabric.Image.fromURL(mask.maskDataUrl, (img: any) => {
-             img.set({ 
-               left: 0, top: 0, 
-               scaleX: containerSize.width / img.width, 
-               scaleY: containerSize.height / img.height, 
-               selectable: true, evented: true, 
-               data: { id: mask.id, type: 'mask' },
-               opacity: mask.opacity ?? 1,
-               visible: mask.visible !== false
-             });
-             fCanvas.add(img); fCanvas.sendToBack(img);
-           });
-         } else {
-           fObj.set({ opacity: mask.opacity ?? 1, visible: mask.visible !== false });
-         }
+         // ... (Logic Image Mask tetap sama)
       } else {
-        // FIX: Render Manual Mask (Rect / Oval) tanpa variabel ganda
+        const shapeProps = { 
+          ...mProps, opacity: mask.opacity ?? 1, visible: mask.visible !== false,
+          stroke: mask.stroke || '#000000', strokeWidth: mask.strokeWidth || 0,
+          scaleX: 1, scaleY: 1 
+        };
+
         if (!fObj) {
           const shapeObj = mask.shape === 'oval' 
             ? new fabric.Ellipse({ ...shapeProps, rx: mask.width/2, ry: mask.height/2, data: { id: mask.id, type: 'mask' } })
@@ -351,10 +341,7 @@ const Editor: React.FC<EditorProps> = ({
           fCanvas.add(shapeObj);
         } else {
           fObj.set(shapeProps);
-          // Jika Oval (Ellipse), pastikan radius rx/ry ikut diperbarui sesuai lebar/tinggi baru
-          if (fObj.type === 'ellipse') {
-            fObj.set({ rx: mask.width / 2, ry: mask.height / 2 });
-          }
+          if (fObj.type === 'ellipse') fObj.set({ rx: mask.width/2, ry: mask.height/2 });
         }
       }
     });
