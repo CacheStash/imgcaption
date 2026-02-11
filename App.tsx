@@ -294,15 +294,26 @@ const App: React.FC = () => {
     setState(prev => {
       const isLocal = prev.selectedPageId && prev.pages.find(p => p.id === prev.selectedPageId)?.isLocalStyle;
       const newPages = prev.pages.map(page => {
+        // Jika sedang mode lokal, hanya update halaman terpilih
         if (isLocal && page.id === prev.selectedPageId) {
-          return { ...page, localStyle: newStyle, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
+          return { 
+            ...page, 
+            localStyle: newStyle, 
+            // FIX: Hanya spread gaya baru tanpa mereset koordinat x dan y yang sudah ada
+            textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle })) 
+          };
         }
+        // Jika halaman punya gaya lokal sendiri, lewati (jangan timpa gaya global)
         if (page.isLocalStyle) return page;
-        return { ...page, textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle, x, y })) };
+        // Update halaman global (hanya yang tidak punya local style)
+        return { 
+          ...page, 
+          textObjects: page.textObjects.map(obj => ({ ...obj, ...newStyle })) 
+        };
       });
       return { ...prev, globalStyle: isLocal ? prev.globalStyle : newStyle, pages: newPages };
     });
-  }, [state.importMode]);
+  }, []);
 
   const toggleLocalSettings = useCallback((pageId: string) => {
     recordHistory();
