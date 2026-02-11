@@ -277,13 +277,21 @@ const Editor: React.FC<EditorProps> = ({
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === obj.id && o.data?.type === 'text');
       const tProps = { 
         width: textWidth,
-        fontSize: obj.fontSize, fill: obj.color, textAlign: 'center', 
-        originX: 'center', originY: 'center', fontFamily: obj.fontFamily, text: content, 
-        fontWeight: obj.fontWeight || 'normal', // FIX: Terapkan setting Bold ke Fabric.js
+        fontSize: obj.fontSize, 
+        fill: obj.color, 
+        textAlign: obj.alignment || 'center', // Mengikuti state alignment dari sidebar
+        originX: 'center', 
+        originY: 'center', 
+        fontFamily: obj.fontFamily, 
+        text: content, 
+        fontWeight: obj.fontWeight || 'normal',
         visible: obj.visible !== false, 
-        scaleX: 1, scaleY: 1, 
-        stroke: obj.outlineColor, strokeWidth: obj.outlineWidth,
-        paintFirst: 'stroke', strokeLineJoin: 'round',
+        scaleX: 1, 
+        scaleY: 1, 
+        stroke: obj.outlineColor, 
+        strokeWidth: obj.outlineWidth,
+        paintFirst: 'stroke', 
+        strokeLineJoin: 'round',
         shadow: new fabric.Shadow({ color: obj.glowColor, blur: obj.glowBlur, opacity: obj.glowOpacity }) 
       };
 
@@ -294,23 +302,7 @@ const Editor: React.FC<EditorProps> = ({
       } else if (!fObj.isEditing) {
         fObj.set({ ...tProps, left: posX, top: posY });
       }
-
-      // FIX 3: ANTI-NABRAK BAWAH (Rem Otomatis)
-      if (fObj) {
-        const halfH = (fObj.height * fObj.scaleY) / 2;
-        const maxTop = containerSize.height - (obj.paddingBottom || 0) - halfH;
-        const minTop = (obj.paddingTop || 0) + halfH;
-        
-        let safeTop = fObj.top;
-        if (safeTop > maxTop) safeTop = maxTop;
-        if (safeTop < minTop) safeTop = minTop;
-        
-        if (fObj.top !== safeTop) {
-          fObj.set({ top: safeTop }).setCoords();
-        }
-      }
-    });
-
+      });
     (page.masks || []).forEach((mask) => {
       let fObj = fCanvas.getObjects().find((o: any) => o.data?.id === mask.id && o.data?.type === 'mask');
       const mProps = { left: (mask.x/100)*containerSize.width, top: (mask.y/100)*containerSize.height, width: mask.width, height: mask.height, fill: mask.fill, originX: 'center', originY: 'center' };
