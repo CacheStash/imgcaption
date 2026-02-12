@@ -245,7 +245,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
         
         let finalWidth, finalHeight;
         
-        // Logika Best Fit (Akan mengikuti rasio manapun yang lebih dominan)
+        // Logika Best Fit untuk menangani segala rasio gambar
         if (imgRatio > contRatio) {
           finalWidth = contWidth;
           finalHeight = contWidth / imgRatio;
@@ -254,7 +254,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
           finalWidth = contHeight * imgRatio;
         }
 
-        
+
         fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
         img.set({ 
           scaleX: finalWidth / img.width, 

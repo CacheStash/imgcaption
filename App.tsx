@@ -507,6 +507,7 @@ const App: React.FC = () => {
   }, [recordHistory]);
 
   // --- Ganti mulai Baris 520 (setelah fungsi clearAllData) ---
+  // --- Ganti dari baris 520 (setelah fungsi clearAllData) sampai akhir file ---
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-100 overflow-hidden">
       <Sidebar 
@@ -565,8 +566,8 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                {/* BARIS 3: AREA EDITOR - DIPAKSA FULL UNTUK MENGISI RUANG */}
-                <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 shadow-inner flex items-center justify-center overflow-hidden">
+                {/* BARIS 3: AREA EDITOR - INI FIX AGAR BESAR */}
+                <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 flex items-center justify-center overflow-hidden">
                   <div className="w-full h-full flex items-center justify-center">
                     {selectedPage && (
                       <Editor 
