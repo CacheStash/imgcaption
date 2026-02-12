@@ -5,13 +5,13 @@ import { cleanText } from '../utils/helpers';
 interface EditorProps {
   page: Page;
   hideLabels: boolean;
-  selectedTextId: string | null;
-  selectedMaskId?: string | null;
+  selectedTextIds: string[];
+  selectedMaskIds: string[];
   importMode: ImportMode;
   onUpdateText: (textId: string, updates: Partial<TextObject>) => void;
   onUpdateMask: (maskId: string, updates: Partial<MaskObject>) => void;
-  onSelectText: (id: string | null) => void;
-  onSelectMask: (id: string | null) => void;
+  onSelectText: (ids: string[]) => void;
+  onSelectMask: (ids: string[]) => void;
   onRecordHistory: () => void;
   onResize: (width: number) => void;
   isSmartFill: boolean;
@@ -21,7 +21,7 @@ interface EditorProps {
 declare const fabric: any;
 
 const Editor: React.FC<EditorProps> = ({ 
-  page, hideLabels, selectedTextId, selectedMaskId, importMode, 
+page, hideLabels, selectedTextIds, selectedMaskIds, importMode, 
   onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize,
   isSmartFill, onAddSmartMask
 }) => {
@@ -34,9 +34,9 @@ const Editor: React.FC<EditorProps> = ({
   // Simpan fungsi update dalam box rahasia supaya selalu terbaru
   const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill });
   useEffect(() => { 
-    callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill }; 
+callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill }; 
   }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill]);
-
+  
   // --- ALGORITMA FLOOD FILL (Smart Bucket) ---
   const performSmartFill = (startX: number, startY: number) => {
     const fCanvas = fabricCanvasRef.current;
@@ -138,10 +138,27 @@ const Editor: React.FC<EditorProps> = ({
     });
     fabricCanvasRef.current = fCanvas;
 
-    fCanvas.on('selection:created', (e: any) => {
-      const obj = e.selected ? e.selected[0] : e.target;
-      if (obj?.data?.type === 'text') callbacks.current.onSelectText(obj.data.id);
-      else if (obj?.data?.type === 'mask') callbacks.current.onSelectMask(obj.data.id);
+   // Styling Marquee Selection (Adobe Illustrator Style)
+    fCanvas.selectionColor = 'rgba(59, 130, 246, 0.15)';
+    fCanvas.selectionBorderColor = 'rgba(59, 130, 246, 0.8)';
+    fCanvas.selectionLineWidth = 1;
+
+    const handleSelection = (e: any) => {
+      // Menangkap array objek yang diseleksi (baik klik tunggal maupun marquee)
+      const selected = e.selected || (e.target ? [e.target] : []);
+      const textIds = selected.filter((o: any) => o.data?.type === 'text').map((o: any) => o.data.id);
+      const maskIds = selected.filter((o: any) => o.data?.type === 'mask').map((o: any) => o.data.id);
+      
+      // Update state seleksi global dengan array ID
+      if (textIds.length > 0) callbacks.current.onSelectText(textIds);
+      else if (maskIds.length > 0) callbacks.current.onSelectMask(maskIds);
+    };
+
+    fCanvas.on('selection:created', handleSelection);
+    fCanvas.on('selection:updated', handleSelection);
+    fCanvas.on('selection:cleared', () => { 
+      callbacks.current.onSelectText([]); 
+      callbacks.current.onSelectMask([]); 
     });
 
     fCanvas.on('mouse:down', (e: any) => {

@@ -24,7 +24,9 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('comic-editor-state-v10');
     const initial: AppState = {
       pages: [], hideLabels: false, importMode: 'box', selectedPageId: null,
-      selectedTextId: null, selectedMaskId: null, isGalleryView: true, globalStyle: DEFAULT_STYLE, savedStyles: [],
+      selectedTextIds: [], // Diubah menjadi array
+      selectedMaskIds: [], // Diubah menjadi array
+      isGalleryView: true, globalStyle: DEFAULT_STYLE, savedStyles: [],
       isSmartFillMode: false // Default off
     };
     if (saved) {
@@ -69,8 +71,8 @@ const App: React.FC = () => {
     recordHistory();
     setState(prev => ({
       ...prev,
-      selectedTextId: prev.selectedTextId === id ? null : prev.selectedTextId,
-      selectedMaskId: prev.selectedMaskId === id ? null : prev.selectedMaskId,
+      selectedTextIds: prev.selectedTextIds.filter(tid => tid !== id),
+      selectedMaskIds: prev.selectedMaskIds.filter(mid => mid !== id),
       pages: prev.pages.map(p => p.id === prev.selectedPageId ? {
         ...p,
         textObjects: p.textObjects.filter(t => t.id !== id),
@@ -95,45 +97,44 @@ const App: React.FC = () => {
   // FITUR: Duplikasi Layer
   const duplicateSelectedElement = useCallback(() => {
     if (!selectedPage) return;
-    const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
-    const maskObj = selectedPage.masks?.find(m => m.id === state.selectedMaskId);
+    const textsToDup = selectedPage.textObjects.filter(t => state.selectedTextIds.includes(t.id));
+    const masksToDup = (selectedPage.masks || []).filter(m => state.selectedMaskIds.includes(m.id));
     
-    if (!textObj && !maskObj) return;
+    if (textsToDup.length === 0 && masksToDup.length === 0) return;
     recordHistory();
 
-    const newId = generateId();
+    const newTextObjs = textsToDup.map(t => ({ ...t, id: generateId(), x: t.x + 5, y: t.y + 5 }));
+    const newMaskObjs = masksToDup.map(m => ({ ...m, id: generateId(), x: m.x + 5, y: m.y + 5 }));
+
     setState(prev => ({
       ...prev,
-      selectedTextId: textObj ? newId : prev.selectedTextId,
-      selectedMaskId: maskObj ? newId : prev.selectedMaskId,
+      selectedTextIds: newTextObjs.map(t => t.id),
+      selectedMaskIds: newMaskObjs.map(m => m.id),
       pages: prev.pages.map(p => p.id === selectedPage.id ? {
         ...p,
-        textObjects: textObj ? [...p.textObjects, { ...textObj, id: newId, x: textObj.x + 5, y: textObj.y + 5 }] : p.textObjects,
-        masks: maskObj ? [...(p.masks || []), { ...maskObj, id: newId, x: maskObj.x + 5, y: maskObj.y + 5 }] : p.masks
+        textObjects: [...p.textObjects, ...newTextObjs],
+        masks: [...(p.masks || []), ...newMaskObjs]
       } : p)
     }));
-  }, [selectedPage, state.selectedTextId, state.selectedMaskId, recordHistory]);
-
+  }, [selectedPage, state.selectedTextIds, state.selectedMaskIds, recordHistory]);
   // FIX: Delete Key (Surgical Fix)
   const deleteSelectedElement = useCallback(() => {
     if (!state.selectedPageId) return;
-    if (!state.selectedTextId && !state.selectedMaskId) return;
-
-    const textIdToDelete = state.selectedTextId;
-    const maskIdToDelete = state.selectedMaskId;
+    if (state.selectedTextIds.length === 0 && state.selectedMaskIds.length === 0) return;
 
     recordHistory();
     setState(prev => ({
       ...prev,
-      selectedTextId: null,
-      selectedMaskId: null,
+      selectedTextIds: [],
+      selectedMaskIds: [],
       pages: prev.pages.map(p => (p.id === prev.selectedPageId) ? { 
           ...p, 
-          textObjects: p.textObjects.filter(t => t.id !== textIdToDelete),
-          masks: (p.masks || []).filter(m => m.id !== maskIdToDelete)
+          textObjects: p.textObjects.filter(t => !prev.selectedTextIds.includes(t.id)),
+          masks: (p.masks || []).filter(m => !prev.selectedMaskIds.includes(m.id))
         } : p)
     }));
-  }, [state.selectedPageId, state.selectedTextId, state.selectedMaskId, recordHistory]);
+  }, [state.selectedPageId, state.selectedTextIds, state.selectedMaskIds, recordHistory]);
+
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -212,15 +213,16 @@ const App: React.FC = () => {
         pages: prev.pages.map(p => (p.id === pageId) ? { 
           ...p, textObjects: [...p.textObjects, createDefaultTextObject("New Dialogue", style, mode)] 
         } : p),
-        selectedTextId: null 
+        selectedTextIds: [], // Dikosongkan agar tidak konflik dengan objek baru
+        selectedMaskIds: []
       };
     });
   }, [recordHistory]);
 
   // FIX: Fungsi split diletakkan mandiri (tidak di dalam addTextManually)
   const splitSelectedText = useCallback(() => {
-    if (!selectedPage || !state.selectedTextId) return;
-    const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextId);
+    if (!selectedPage || state.selectedTextIds.length === 0) return;
+    const textObj = selectedPage.textObjects.find(t => t.id === state.selectedTextIds[0]);
     if (!textObj) return;
 
     // Logika Pecah Box: Pisahkan berdasarkan tanda koma ( , ) atau baris baru
@@ -245,7 +247,7 @@ const App: React.FC = () => {
         textObjects: [...p.textObjects.filter(t => t.id !== textObj.id), ...newObjects]
       } : p)
     }));
-  }, [selectedPage, state.selectedTextId, recordHistory]);
+}, [selectedPage, state.selectedTextIds, recordHistory]);
 
   // FITUR 3: Handler Tambah Masker Pintar (Smart Bucket)
   const addSmartMask = useCallback((pageId: string, maskData: MaskObject) => {
@@ -253,7 +255,8 @@ const App: React.FC = () => {
     setState(prev => ({
       ...prev,
       pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), maskData] } : p),
-      isSmartFillMode: false // Matikan mode setelah selesai fill
+    selectedTextIds: [],
+      selectedMaskIds: [maskData.id]
     }));
   }, [recordHistory]);
 
@@ -551,9 +554,10 @@ const App: React.FC = () => {
                   <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={effectiveImportMode} 
                     onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} 
                     onUpdateMask={(id, upd) => updateMask(selectedPage.id, id, upd)}
-                    selectedTextId={state.selectedTextId} selectedMaskId={state.selectedMaskId}
-                    onSelectText={id => setState(p => ({ ...p, selectedTextId: id, selectedMaskId: null }))}
-                    onSelectMask={id => setState(p => ({ ...p, selectedMaskId: id, selectedTextId: null }))}
+                    selectedTextIds={state.selectedTextIds} 
+                    selectedMaskIds={state.selectedMaskIds}
+                    onSelectText={ids => setState(p => ({ ...p, selectedTextIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedMaskIds: [] }))}
+                    onSelectMask={ids => setState(p => ({ ...p, selectedMaskIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedTextIds: [] }))}
                     onRecordHistory={recordHistory} onResize={setPreviewWidth} 
                     isSmartFill={state.isSmartFillMode} // Prop baru
                     onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)} // Prop baru
