@@ -343,96 +343,102 @@ export const EditorToolbar: React.FC<SidebarProps & { zoom?: number, setZoom?: (
   if (!selectedPage || state.isGalleryView) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 h-full py-1">
-      {/* 1. TEXT STYLE & EFFECTS (RESTORED OUTLINE & GLOW) */}
-      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[7px] text-slate-500 font-bold uppercase">Style & Effects</span>
-          <div className="flex items-center gap-1.5">
-            <input type="color" value={styleToDisplay.color} onChange={(e) => updateActiveStyle({ color: e.target.value })} className="w-5 h-5 rounded bg-slate-900 border border-slate-700 cursor-pointer" title="Text Color" />
-            <select value={styleToDisplay.fontFamily} onChange={(e) => updateActiveStyle({ fontFamily: e.target.value })} className="h-6 bg-slate-900 border border-slate-800 rounded text-[9px] px-1 w-20 outline-none">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-4 h-full py-4 px-6 w-full">
+      {/* 1. TEXT STYLE & EFFECTS (TEBAL & SLIDER LENGKAP) */}
+      <div className="flex items-center gap-4 pr-6 border-r border-slate-800">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Style & Effects</span>
+          <div className="flex items-center gap-2">
+            <input type="color" value={styleToDisplay.color} onChange={(e) => updateActiveStyle({ color: e.target.value })} className="w-8 h-8 rounded bg-slate-900 border border-slate-700 cursor-pointer shadow-lg" title="Text Color" />
+            <select value={styleToDisplay.fontFamily} onChange={(e) => updateActiveStyle({ fontFamily: e.target.value })} className="h-8 bg-slate-900 border border-slate-800 rounded text-[11px] font-bold px-2 w-32 outline-none focus:ring-1 focus:ring-blue-500">
               {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
             </select>
-            <input type="number" value={styleToDisplay.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-9 h-6 bg-slate-900 border border-slate-800 rounded text-[9px] px-1" />
-            <button onClick={() => updateActiveStyle({ fontWeight: styleToDisplay.fontWeight === 'bold' ? 'normal' : 'bold' })} className={`w-6 h-6 rounded border text-[9px] font-bold ${styleToDisplay.fontWeight === 'bold' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>B</button>
+            <input type="number" value={styleToDisplay.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-14 h-8 bg-slate-900 border border-slate-800 rounded text-[11px] font-bold px-1 text-center" />
+            <button onClick={() => updateActiveStyle({ fontWeight: styleToDisplay.fontWeight === 'bold' ? 'normal' : 'bold' })} className={`w-8 h-8 rounded border text-[11px] font-black transition-all ${styleToDisplay.fontWeight === 'bold' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>B</button>
             
-            {/* Outline & Glow Quick Controls */}
-            <div className="flex items-center gap-1 ml-1 pl-2 border-l border-slate-800">
-              <input type="color" value={styleToDisplay.outlineColor} onChange={(e) => updateActiveStyle({ outlineColor: e.target.value })} className="w-4 h-4 rounded-full" title="Outline Color" />
-              <input type="range" min="0" max="10" value={styleToDisplay.outlineWidth} onChange={(e) => updateActiveStyle({ outlineWidth: Number(e.target.value) })} className="w-10 accent-blue-500" title="Outline Width" />
-              <input type="color" value={styleToDisplay.glowColor} onChange={(e) => updateActiveStyle({ glowColor: e.target.value })} className="w-4 h-4 rounded-full" title="Glow Color" />
+            {/* Outline & Glow Sliders (Maksimal 50 & 100) */}
+            <div className="flex items-center gap-4 ml-2 pl-4 border-l border-slate-800">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <input type="color" value={styleToDisplay.outlineColor} onChange={(e) => updateActiveStyle({ outlineColor: e.target.value })} className="w-5 h-5 rounded-full border border-slate-700" title="Outline Color" />
+                  <span className="text-[8px] text-slate-600 font-bold uppercase tracking-tighter">Outline</span>
+                </div>
+                <input type="range" min="0" max="50" value={styleToDisplay.outlineWidth} onChange={(e) => updateActiveStyle({ outlineWidth: Number(e.target.value) })} className="w-32 accent-blue-500 h-1.5" title="Outline Width" />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <input type="color" value={styleToDisplay.glowColor} onChange={(e) => updateActiveStyle({ glowColor: e.target.value })} className="w-5 h-5 rounded-full border border-slate-700" title="Glow Color" />
+                  <span className="text-[8px] text-slate-600 font-bold uppercase tracking-tighter">Glow</span>
+                </div>
+                <input type="range" min="0" max="100" value={styleToDisplay.glowBlur} onChange={(e) => updateActiveStyle({ glowBlur: Number(e.target.value) })} className="w-32 accent-indigo-500 h-1.5" title="Glow Blur" />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. POS/SNAP & PARAGRAPH ALIGN (RESTORED) */}
-      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[7px] text-slate-500 font-bold uppercase">Snapping & Align</span>
-          <div className="flex gap-1">
-            <div className="flex bg-slate-900 p-0.5 rounded border border-slate-800">
+      {/* 2. POS/SNAP & ALIGN (LEBIH BESAR) */}
+      <div className="flex items-center gap-4 pr-6 border-r border-slate-800">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Snapping & Align</span>
+          <div className="flex gap-2">
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 gap-0.5">
               {(['left', 'center', 'right', 'none'] as Alignment[]).map((a) => (
-                <button key={a} onClick={() => updateActiveStyle({ alignment: a })} className={`w-5 h-5 text-[7px] font-bold rounded ${styleToDisplay.alignment === a ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{a === 'none' ? 'X' : a[0].toUpperCase()}</button>
+                <button key={a} onClick={() => updateActiveStyle({ alignment: a })} className={`w-8 h-7 text-[10px] font-black rounded ${styleToDisplay.alignment === a ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{a === 'none' ? 'OFF' : a[0].toUpperCase()}</button>
               ))}
             </div>
-            <div className="flex bg-slate-900 p-0.5 rounded border border-slate-800">
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 gap-0.5">
               {(['top', 'middle', 'bottom', 'none'] as VerticalAlignment[]).map((v) => (
-                <button key={v} onClick={() => updateActiveStyle({ verticalAlignment: v })} className={`w-5 h-5 text-[7px] font-bold rounded ${styleToDisplay.verticalAlignment === v ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{v === 'none' ? 'X' : v[0].toUpperCase()}</button>
+                <button key={v} onClick={() => updateActiveStyle({ verticalAlignment: v })} className={`w-8 h-7 text-[10px] font-black rounded ${styleToDisplay.verticalAlignment === v ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{v === 'none' ? 'OFF' : v[0].toUpperCase()}</button>
               ))}
             </div>
-            {/* Paragraph Align inside box */}
-            <div className="flex bg-slate-900 p-0.5 rounded border border-slate-800 ml-1">
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 gap-0.5">
               {(['left', 'center', 'right'] as Alignment[]).map((a) => (
-                <button key={a} onClick={() => updateActiveStyle({ textAlign: a })} className={`w-5 h-5 text-[7px] font-bold rounded ${styleToDisplay.textAlign === a ? 'bg-emerald-600 text-white' : 'text-slate-500'}`}>{a[0].toUpperCase()}</button>
+                <button key={a} onClick={() => updateActiveStyle({ textAlign: a })} className={`w-8 h-7 text-[10px] font-black rounded ${styleToDisplay.textAlign === a ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{a[0].toUpperCase()}</button>
               ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. SAFE AREA / MARGINS (RESTORED) */}
-      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[7px] text-slate-500 font-bold uppercase">Safe Area (Margin)</span>
-          <div className="flex gap-1">
+      {/* 3. SAFE AREA (LEBIH JELAS) */}
+      <div className="flex items-center gap-4 pr-6 border-r border-slate-800">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Safe Area</span>
+          <div className="grid grid-cols-4 gap-2">
             {['Top', 'Bottom', 'Left', 'Right'].map((dir) => (
               <div key={dir} className="flex flex-col items-center">
-                <input type="number" value={(styleToDisplay as any)[`padding${dir}`]} onChange={(e) => updateActiveStyle({ [`padding${dir}`]: Number(e.target.value) })} className="w-7 h-5 bg-slate-900 border border-slate-800 rounded text-[8px] text-center" title={dir} />
+                <input type="number" value={(styleToDisplay as any)[`padding${dir}`]} onChange={(e) => updateActiveStyle({ [`padding${dir}`]: Number(e.target.value) })} className="w-10 h-7 bg-slate-900 border border-slate-800 rounded text-[10px] font-bold text-center focus:border-blue-500 outline-none" title={dir} />
+                <span className="text-[7px] text-slate-600 font-bold mt-0.5 uppercase tracking-tighter">{dir[0]}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* 4. ZOOM CONTROLS (NEW) */}
-      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[7px] text-slate-500 font-bold uppercase">Zoom</span>
-          <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded border border-slate-800">
-            <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="w-5 h-5 bg-slate-800 hover:bg-slate-700 rounded text-[10px]">-</button>
-            <span className="text-[8px] w-7 text-center font-mono">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="w-5 h-5 bg-slate-800 hover:bg-slate-700 rounded text-[10px]">+</button>
+      {/* 4. ZOOM & TOOLS (UKURAN PRO) */}
+      <div className="flex items-center gap-8">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Zoom Control</span>
+          <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800">
+            <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="w-8 h-8 bg-slate-800 hover:bg-slate-700 rounded-md text-[16px] font-black transition-colors">-</button>
+            <span className="text-[11px] w-12 text-center font-mono font-bold text-blue-400">{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="w-8 h-8 bg-slate-800 hover:bg-slate-700 rounded-md text-[16px] font-black transition-colors">+</button>
           </div>
         </div>
-      </div>
 
-      {/* 5. QUICK TOOLS */}
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[7px] text-slate-500 font-bold uppercase">Quick Tools</span>
-        <div className="flex items-center gap-1">
-          <button onClick={() => onAddText(selectedPage.id)} className="h-6 px-1.5 bg-blue-600 text-white rounded text-[8px] font-bold">+ TEXT</button>
-          <button onClick={() => onAddMask(selectedPage.id, 'rect')} className="h-6 px-1.5 bg-slate-800 text-slate-300 rounded text-[8px] font-bold">SQUARE</button>
-          <button onClick={() => onAddMask(selectedPage.id, 'oval')} className="h-6 px-1.5 bg-slate-800 text-slate-300 rounded text-[8px] font-bold">OVAL</button>
-          <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-6 px-1.5 border rounded text-[8px] font-bold transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>SMART BUCKET</button>
-          {selectedText && <button onClick={onSplitText} className="h-6 px-1.5 bg-indigo-600 text-white rounded text-[8px] font-bold">SPLIT</button>}
-          {selectedMask && (
-            <div className="flex items-center gap-1 ml-1 pl-1 border-l border-slate-800">
-              <span className="text-[6px] text-slate-500">OPA</span>
-              <input type="range" min="0" max="1" step="0.1" value={selectedMask.opacity ?? 1} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })} className="w-12 accent-blue-500 h-1" />
-            </div>
-          )}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Quick Actions</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => onAddText(selectedPage.id)} className="h-9 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-black shadow-lg transition-transform active:scale-95 uppercase tracking-wider">+ Text</button>
+            <button onClick={() => onAddMask(selectedPage.id, 'rect')} className="h-9 px-4 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-[11px] font-black uppercase tracking-wider">Square</button>
+            <button onClick={() => onAddMask(selectedPage.id, 'oval')} className="h-9 px-4 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-[11px] font-black uppercase tracking-wider">Oval</button>
+            <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-9 px-4 border rounded-lg text-[11px] font-black transition-all uppercase tracking-wider ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse shadow-pink-500/30 shadow-lg' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'}`}>Smart Bucket</button>
+            {selectedText && <button onClick={onSplitText} className="h-9 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-black shadow-lg uppercase tracking-wider">Split</button>}
+          </div>
         </div>
+        
       </div>
     </div>
   );

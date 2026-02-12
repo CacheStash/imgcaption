@@ -551,9 +551,9 @@ const App: React.FC = () => {
 
                 {/* BARIS 2: TOOLBAR */}
                 {selectedPage && (
-                  <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 shadow-xl overflow-x-auto scrollbar-none w-full">
+                  <div className="shrink-0 bg-slate-950 border-b border-slate-800 shadow-2xl overflow-x-auto scrollbar-none w-full">
                     <EditorToolbar 
-                      state={state} setState={setState} onUpdateText={updatePageText} 
+                      state={state} setState={setState} onUpdateText={updatePageText}
                       onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask} 
                       onUpdateGlobalStyle={updateGlobalStyle} onSplitText={splitSelectedText}
                       onTextImport={handleTextImport} onClearAll={clearAllData}
