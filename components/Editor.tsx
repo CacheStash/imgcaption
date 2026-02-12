@@ -261,15 +261,16 @@ page, hideLabels, selectedTextIds, selectedMaskIds, importMode,
       fabric.Image.fromURL(page.imageUrl, (img: any) => {
         if (!img) return;
 
-        // DEFINISI imgRatio (Menyelesaikan error "Cannot find name imgRatio")
+        // HITUNG imgRatio (Menyelesaikan error blank "imgRatio is not defined")
         const imgRatio = img.width / img.height;
-        
-        // LOGIKA AUTO FULL WIDTH
+
+        // LOGIKA AUTO FULL WIDTH: Lebar selalu ikut layar
         const finalWidth = contWidth;
         const finalHeight = contWidth / imgRatio;
         
         setBaseDimensions({ width: finalWidth, height: finalHeight });
 
+        // Terapkan dimensi fisik dan zoom awal
         fCanvas.setDimensions({ 
           width: finalWidth * zoom, 
           height: finalHeight * zoom 
@@ -281,7 +282,12 @@ page, hideLabels, selectedTextIds, selectedMaskIds, importMode,
           scaleY: finalHeight / img.height, 
           left: 0, top: 0, selectable: false, evented: false 
         });
-// --- END FIX ---
+
+        fCanvas.setBackgroundImage(img, () => {
+          setContainerSize({ width: finalWidth, height: finalHeight });
+          callbacks.current.onResize(finalWidth);
+          fCanvas.renderAll(); 
+        });
       }, { crossOrigin: 'anonymous' });
     };
 

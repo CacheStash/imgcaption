@@ -509,7 +509,7 @@ const App: React.FC = () => {
 
   // --- Ganti mulai Baris 520 (setelah fungsi clearAllData) ---
   // --- Ganti dari baris 520 (setelah fungsi clearAllData) sampai akhir file ---
-  return (
+ return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-100 overflow-hidden">
       <Sidebar 
         state={state} setState={setState} onTextImport={handleTextImport}
@@ -517,13 +517,9 @@ const App: React.FC = () => {
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-        onSplitText={splitSelectedText}
-        onDuplicate={duplicateSelectedElement}
-        onDeleteLayer={deleteObjectById}
-        onToggleVisibility={toggleObjectVisibility}
-        // Link State Zoom ke Sidebar
-        zoom={zoom} 
-        setZoom={setZoom}
+        onSplitText={splitSelectedText} onDuplicate={duplicateSelectedElement}
+        onDeleteLayer={deleteObjectById} onToggleVisibility={toggleObjectVisibility}
+        zoom={zoom} setZoom={setZoom}
       />
       
       <main className="flex-1 flex flex-col min-w-0 bg-slate-900 overflow-hidden relative">
@@ -547,13 +543,13 @@ const App: React.FC = () => {
                     <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
                     <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
                   </div>
-                  <div className="text-right pr-4">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-tighter truncate max-w-[200px]">{selectedPage?.fileName}</p>
-                    <p className="text-[10px] text-blue-500 font-bold">PAGE {currentPageIndex + 1}</p>
+                  <div className="text-right pr-4 shrink-0">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-tighter truncate max-w-[150px]">{selectedPage?.fileName}</p>
+                    <p className="text-[10px] text-blue-500 font-bold uppercase">Page {currentPageIndex + 1}</p>
                   </div>
                 </div>
 
-                {/* BARIS 2: TOOLBAR HORIZONTAL */}
+                {/* BARIS 2: TOOLBAR */}
                 {selectedPage && (
                   <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 shadow-xl overflow-x-auto scrollbar-none w-full">
                     <EditorToolbar 
@@ -563,14 +559,12 @@ const App: React.FC = () => {
                       onTextImport={handleTextImport} onClearAll={clearAllData}
                       onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
                       onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-                      // Teruskan State Zoom ke Toolbar
-                      zoom={zoom}
-                      setZoom={setZoom}
+                      zoom={zoom} setZoom={setZoom}
                     />
                   </div>
                 )}
 
-                {/* BARIS 3: AREA EDITOR - FULL WIDTH & ZOOM READY */}
+                {/* BARIS 3: AREA EDITOR - FULL WIDTH & ZOOM SUPPORT */}
                 <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 shadow-inner flex items-start justify-center overflow-auto scrollbar-thin">
                   <div className="w-full flex flex-col items-center">
                     {selectedPage && (
@@ -583,7 +577,6 @@ const App: React.FC = () => {
                         onSelectMask={ids => setState(p => ({ ...p, selectedMaskIds: ids, selectedTextIds: [] }))}
                         onRecordHistory={recordHistory} onResize={setPreviewWidth} 
                         isSmartFill={state.isSmartFillMode} onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)}
-                        // Prop Zoom ke Editor
                         zoom={zoom}
                       />
                     )}
@@ -596,6 +589,8 @@ const App: React.FC = () => {
       </main>
     </div>
   );
+// --- END FIX ---
+// --- Context Anchor (Below) --- 
 };
 
 export default App;
