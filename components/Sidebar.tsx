@@ -354,7 +354,7 @@ export const EditorToolbar: React.FC<SidebarProps & { zoom?: number, setZoom?: (
 
   return (
     <div className="flex flex-wrap items-center gap-x-8 gap-y-4 h-full py-4 px-8 w-full bg-slate-950/50">
-      {/* 1. STYLE & EFFECTS (TEBAL & SLIDER MAX 50) */}
+      {/* 1. TEXT STYLE & EFFECTS (TEBAL & SLIDER MAX 50) */}
       <div className="flex items-center gap-4 pr-6 border-r border-slate-800">
         <div className="flex flex-col gap-1.5">
           <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Text Style & Effects</span>
@@ -386,19 +386,19 @@ export const EditorToolbar: React.FC<SidebarProps & { zoom?: number, setZoom?: (
         </div>
       </div>
 
-      {/* 2. SNAPPING & MARGINS */}
+      {/* 2. SNAPPING & MARGINS (LEBIH LEGA) */}
       <div className="flex items-center gap-6 pr-6 border-r border-slate-800">
         <div className="flex flex-col gap-1.5">
           <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Snapping</span>
           <div className="flex gap-2">
             <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 gap-0.5">
               {(['left', 'center', 'right', 'none'] as Alignment[]).map((a) => (
-                <button key={a} onClick={() => updateActiveStyle({ alignment: a })} className={`w-8 h-7 text-[10px] font-black rounded ${styleToDisplay.alignment === a ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{a === 'none' ? 'X' : a[0].toUpperCase()}</button>
+                <button key={a} onClick={() => updateActiveStyle({ alignment: a })} className={`w-8 h-7 text-[10px] font-black rounded ${styleToDisplay.alignment === a ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500'}`}>{a === 'none' ? 'X' : a[0].toUpperCase()}</button>
               ))}
             </div>
             <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 gap-0.5">
               {(['top', 'middle', 'bottom', 'none'] as VerticalAlignment[]).map((v) => (
-                <button key={v} onClick={() => updateActiveStyle({ verticalAlignment: v })} className={`w-8 h-7 text-[10px] font-black rounded ${styleToDisplay.verticalAlignment === v ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{v === 'none' ? 'X' : v[0].toUpperCase()}</button>
+                <button key={v} onClick={() => updateActiveStyle({ verticalAlignment: v })} className={`w-8 h-7 text-[10px] font-black rounded ${styleToDisplay.verticalAlignment === v ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500'}`}>{v === 'none' ? 'X' : v[0].toUpperCase()}</button>
               ))}
             </div>
           </div>
@@ -425,10 +425,10 @@ export const EditorToolbar: React.FC<SidebarProps & { zoom?: number, setZoom?: (
           </div>
         </div>
 
-        <div className="flex items-center gap-2 pt-4">
-          <button onClick={() => onAddText(selectedPage.id)} className="h-10 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-black shadow-lg uppercase">+ Text</button>
-          <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-10 px-4 border rounded-xl text-[11px] font-black transition-all uppercase ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse shadow-lg' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>Smart Bucket</button>
-          {selectedText && <button onClick={onSplitText} className="h-10 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[11px] font-black shadow-lg uppercase">Split</button>}
+        <div className="flex items-center gap-3 pt-4">
+          <button onClick={() => onAddText(selectedPage.id)} className="h-10 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-black shadow-lg uppercase tracking-wider transition-transform active:scale-95">+ Text</button>
+          <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-10 px-4 border rounded-xl text-[11px] font-black transition-all uppercase tracking-wider ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse shadow-lg' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>Smart Bucket</button>
+          {selectedText && <button onClick={onSplitText} className="h-10 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[11px] font-black shadow-lg uppercase tracking-wider">Split</button>}
         </div>
       </div>
     </div>

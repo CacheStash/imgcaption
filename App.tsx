@@ -337,26 +337,29 @@ const applyLocalToGlobal = useCallback((pageId: string) => {
     if (!window.confirm("Apply this page's style to all other pages?")) return;
 
     recordHistory();
-    const newGlobalStyle = JSON.parse(JSON.stringify(page.localStyle));
-    
+    // Ambil gaya lokal saat ini untuk dijadikan standar Global baru
+    const styleToApply = JSON.parse(JSON.stringify(page.localStyle));
+    const modeToApply = page.importMode || state.importMode;
+
     setState(prev => ({
       ...prev,
-      globalStyle: newGlobalStyle,
+      globalStyle: styleToApply,
+      importMode: modeToApply,
       pages: prev.pages.map(p => {
-        const isTargetPage = p.id === pageId;
-        // Update halaman global (yg tidak local) DAN halaman sumber (target)
-        if (!p.isLocalStyle || isTargetPage) {
+        // Jika ini halaman sumber (target) ATAU halaman yang memang menggunakan Global Style
+        if (p.id === pageId || !p.isLocalStyle) {
           return {
             ...p,
-            // SINKRONISASI: Update localStyle agar UI Sidebar tidak revert
-            localStyle: isTargetPage ? newGlobalStyle : p.localStyle,
-            textObjects: p.textObjects.map(t => ({ ...t, ...newGlobalStyle }))
+            isLocalStyle: false, // MATIKAN mode Local agar sinkron mengikuti Global Style baru
+            localStyle: undefined,
+            importMode: undefined,
+            textObjects: p.textObjects.map(t => ({ ...t, ...styleToApply }))
           };
         }
         return p;
       })
     }));
-  }, [state.pages, recordHistory]);
+  }, [state.pages, state.importMode, recordHistory]);
   
   // Helper untuk Auto Activate Local (FIX Poin 4)
   const activatePageLocal = (page: Page, globalStyle: TextStyle, globalMode: ImportMode): Page => {
