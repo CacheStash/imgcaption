@@ -337,8 +337,18 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
         fCanvas.add(newTxt);
         fObj = newTxt;
       } else if (!fObj.isEditing) {
-        // Apply semua properti secara bersamaan agar tidak ada lonjakan visual
-        fObj.set({ ...tProps, left: finalX, top: finalY });
+       // Jika objek ada di dalam grup (ActiveSelection/Marquee), 
+        // kita harus menghitung ulang koordinatnya agar tetap Snap ke Kanvas secara absolut.
+        if (fObj.group) {
+          const localPoint = fabric.util.transformPoint(
+            { x: finalX, y: finalY },
+            fabric.util.invertTransform(fObj.group.calcTransformMatrix())
+          );
+          fObj.set({ ...tProps, left: localPoint.x, top: localPoint.y });
+        } else {
+          fObj.set({ ...tProps, left: finalX, top: finalY });
+        }
+        
         fObj.setCoords(); 
       }
       
@@ -407,6 +417,12 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
       if (obj.data?.type === 'mask') fCanvas.sendToBack(obj);
       if (obj.data?.type === 'text') fCanvas.bringToFront(obj); 
     });
+// Memaksa Fabric memperbarui kotak biru seleksi jika ada perubahan snapping pada objek di dalamnya
+    const activeSelection = fCanvas.getActiveObject();
+    if (activeSelection && activeSelection.type === 'activeSelection') {
+      activeSelection.addWithUpdate();
+    }
+
 
     fCanvas.requestRenderAll();
   }, [page.textObjects, page.masks, containerSize, hideLabels, importMode]);

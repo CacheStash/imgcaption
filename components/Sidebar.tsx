@@ -127,26 +127,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         <input type="number" value={style.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-2" />
       </div>
 
-      {/* FITUR BARU: DIALOG BOX STYLE */}
+      {/* DIALOG BOX STYLE - SIMPLIFIED: HANYA MARGIN */}
       <div className="border-t border-slate-800 pt-3">
-        <label className="block text-[10px] text-blue-400 mb-2 font-bold uppercase">Dialog Box Style</label>
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <label className="block text-[9px] text-slate-500 mb-1">Shape</label>
-            <select value={style.boxShape || 'none'} onChange={(e) => updateActiveStyle({ boxShape: e.target.value as BoxShape })} className="w-full h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-1">
-              <option value="none">None (Transparent)</option>
-              <option value="rect">Rectangle</option>
-              <option value="rounded">Rounded</option>
-              <option value="oval">Oval / Bubble</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[9px] text-slate-500 mb-1">Bg Color</label>
-            <input type="color" value={style.backgroundColor || '#000000'} onChange={(e) => updateActiveStyle({ backgroundColor: e.target.value })} className="w-full h-8 rounded bg-slate-900 border border-slate-700" />
-          </div>
-        </div>
+        <label className="block text-[10px] text-blue-400 mb-2 font-bold uppercase">Page Margin (Safe Area)</label>
         
-        <label className="block text-[9px] text-slate-500 mb-1 uppercase">Page Margin (Safe Area / Snapping Offset)</label>
         <div className="grid grid-cols-4 gap-1">
           {['Top', 'Bottom', 'Left', 'Right'].map((dir) => (
             <div key={dir} className="flex flex-col">
