@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryState>({ past: [], future: [] });
   const [isExporting, setIsExporting] = useState(false);
   const [previewWidth, setPreviewWidth] = useState(1);
+  const [zoom, setZoom] = useState(1);
   
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('comic-editor-state-v10');
@@ -516,8 +517,13 @@ const App: React.FC = () => {
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-        onSplitText={splitSelectedText} onDuplicate={duplicateSelectedElement}
-        onDeleteLayer={deleteObjectById} onToggleVisibility={toggleObjectVisibility}
+        onSplitText={splitSelectedText}
+        onDuplicate={duplicateSelectedElement}
+        onDeleteLayer={deleteObjectById}
+        onToggleVisibility={toggleObjectVisibility}
+        // Link State Zoom ke Sidebar
+        zoom={zoom} 
+        setZoom={setZoom}
       />
       
       <main className="flex-1 flex flex-col min-w-0 bg-slate-900 overflow-hidden relative">
@@ -528,7 +534,7 @@ const App: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-col min-h-0 p-4 gap-4 overflow-hidden">
             {state.isGalleryView ? (
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto pr-2">
                 <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={handleSelectPage} />
               </div>
             ) : (
@@ -542,26 +548,31 @@ const App: React.FC = () => {
                     <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
                   </div>
                   <div className="text-right pr-4">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-tighter truncate max-w-[150px]">{selectedPage?.fileName}</p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-tighter truncate max-w-[200px]">{selectedPage?.fileName}</p>
                     <p className="text-[10px] text-blue-500 font-bold">PAGE {currentPageIndex + 1}</p>
                   </div>
                 </div>
 
-                {/* BARIS 2: TOOLBAR */}
-                <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 shadow-xl overflow-x-auto scrollbar-none w-full">
-                  <EditorToolbar 
-                    state={state} setState={setState} onUpdateText={updatePageText} 
-                    onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask} 
-                    onUpdateGlobalStyle={updateGlobalStyle} onSplitText={splitSelectedText}
-                    onTextImport={handleTextImport} onClearAll={clearAllData}
-                    onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
-                    onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-                  />
-                </div>
+                {/* BARIS 2: TOOLBAR HORIZONTAL */}
+                {selectedPage && (
+                  <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 shadow-xl overflow-x-auto scrollbar-none w-full">
+                    <EditorToolbar 
+                      state={state} setState={setState} onUpdateText={updatePageText} 
+                      onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask} 
+                      onUpdateGlobalStyle={updateGlobalStyle} onSplitText={splitSelectedText}
+                      onTextImport={handleTextImport} onClearAll={clearAllData}
+                      onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
+                      onToggleLocal={toggleLocalSettings} isExporting={isExporting}
+                      // Teruskan State Zoom ke Toolbar
+                      zoom={zoom}
+                      setZoom={setZoom}
+                    />
+                  </div>
+                )}
 
-                {/* BARIS 3: AREA EDITOR - INI FIX AGAR BESAR */}
-                <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
-                 <div className="w-full h-full flex items-center justify-center">
+                {/* BARIS 3: AREA EDITOR - FULL WIDTH & ZOOM READY */}
+                <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 shadow-inner flex items-start justify-center overflow-auto scrollbar-thin">
+                  <div className="w-full flex flex-col items-center">
                     {selectedPage && (
                       <Editor 
                         key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={effectiveImportMode} 
@@ -572,6 +583,8 @@ const App: React.FC = () => {
                         onSelectMask={ids => setState(p => ({ ...p, selectedMaskIds: ids, selectedTextIds: [] }))}
                         onRecordHistory={recordHistory} onResize={setPreviewWidth} 
                         isSmartFill={state.isSmartFillMode} onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)}
+                        // Prop Zoom ke Editor
+                        zoom={zoom}
                       />
                     )}
                   </div>

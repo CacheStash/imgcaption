@@ -16,6 +16,8 @@ interface EditorProps {
   onResize: (width: number) => void;
   isSmartFill: boolean;
   onAddSmartMask: (mask: MaskObject) => void;
+// --- PARTIAL FIX: TAMBAHKAN ZOOM ---
+  zoom: number;
 }
 
 declare const fabric: any;
@@ -23,20 +25,37 @@ declare const fabric: any;
 const Editor: React.FC<EditorProps> = ({ 
 page, hideLabels, selectedTextIds, selectedMaskIds, importMode, 
   onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize,
-  isSmartFill, onAddSmartMask
+  isSmartFill, onAddSmartMask, 
+  zoom 
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // --- PARTIAL FIX ---
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [baseDimensions, setBaseDimensions] = useState({ width: 0, height: 0 });
 
+  // Efek untuk menangani perubahan Zoom secara aktif pada Fabric Canvas
+  useEffect(() => {
+    const fCanvas = fabricCanvasRef.current;
+    if (!fCanvas || baseDimensions.width === 0) return;
+
+    fCanvas.setZoom(zoom);
+    // Ubah dimensi fisik canvas agar scrollbar di parent (App.tsx) muncul
+    fCanvas.setDimensions({ 
+      width: baseDimensions.width * zoom, 
+      height: baseDimensions.height * zoom 
+    });
+    fCanvas.requestRenderAll();
+  }, [zoom, baseDimensions]);
 
   // Simpan fungsi update dalam box rahasia supaya selalu terbaru
-  const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill });
+  const callbacks = useRef({ onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill, zoom });
   useEffect(() => { 
-callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill }; 
-  }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill]);
-  
+    callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill, zoom }; 
+  }, [onUpdateText, onUpdateMask, onSelectText, onSelectMask, onRecordHistory, onResize, onAddSmartMask, isSmartFill, zoom]);
+
+
   // --- ALGORITMA FLOOD FILL (Smart Bucket) ---
   const performSmartFill = (startX: number, startY: number) => {
     const fCanvas = fabricCanvasRef.current;
@@ -238,36 +257,31 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
       const { width: contWidth, height: contHeight } = containerRef.current!.getBoundingClientRect();
       if (contWidth === 0) return;
 
+      // --- PARTIAL FIX ---
       fabric.Image.fromURL(page.imageUrl, (img: any) => {
         if (!img) return;
-        const imgRatio = img.width / img.height; 
-        const contRatio = contWidth / contHeight;
-        
-        let finalWidth, finalHeight;
-        
-        // Logika Best Fit untuk menangani segala rasio gambar
-        if (imgRatio > contRatio) {
-          finalWidth = contWidth;
-          finalHeight = contWidth / imgRatio;
-        } else {
-          finalHeight = contHeight;
-          finalWidth = contHeight * imgRatio;
-        }
 
-        fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
+        // DEFINISI imgRatio (Menyelesaikan error "Cannot find name imgRatio")
+        const imgRatio = img.width / img.height;
+        
+        // LOGIKA AUTO FULL WIDTH
+        const finalWidth = contWidth;
+        const finalHeight = contWidth / imgRatio;
+        
+        setBaseDimensions({ width: finalWidth, height: finalHeight });
+
+        fCanvas.setDimensions({ 
+          width: finalWidth * zoom, 
+          height: finalHeight * zoom 
+        });
+        fCanvas.setZoom(zoom);
+
         img.set({ 
           scaleX: finalWidth / img.width, 
           scaleY: finalHeight / img.height, 
-          left: 0, top: 0, 
-          selectable: false, 
-          evented: false 
+          left: 0, top: 0, selectable: false, evented: false 
         });
-
-        fCanvas.setBackgroundImage(img, () => {
-          setContainerSize({ width: finalWidth, height: finalHeight });
-          callbacks.current.onResize(finalWidth);
-          fCanvas.renderAll(); 
-        });
+// --- END FIX ---
       }, { crossOrigin: 'anonymous' });
     };
 
@@ -445,7 +459,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
   }, [page.textObjects, page.masks, containerSize, hideLabels, importMode]);
 
   return (
-    <div ref={containerRef} className="w-full h-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden">
+    <div ref={containerRef} className="w-full bg-slate-900 rounded-2xl overflow-visible">
       <canvas ref={canvasRef} />
     </div>
   );

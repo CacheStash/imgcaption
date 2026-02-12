@@ -20,6 +20,8 @@ interface SidebarProps {
   onDuplicate?: () => void;
   onDeleteLayer?: (id: string) => void;
   onToggleVisibility?: (id: string) => void;
+  zoom: number;
+  setZoom: (z: number) => void;
 }
 
 // Sub-komponen panel lipat dengan animasi halus
@@ -317,9 +319,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 };
 // --- Pastikan bagian ini ada di bawah komponen Sidebar utama ---
+// --- Context Anchor: Ganti seluruh fungsi EditorToolbar di bagian bawah Sidebar.tsx ---
 
-export const EditorToolbar: React.FC<SidebarProps> = ({ 
-  state, setState, onUpdateText, onAddText, onAddMask, onUpdateMask, onUpdateGlobalStyle, onSplitText 
+export const EditorToolbar: React.FC<SidebarProps & { zoom?: number, setZoom?: (z: number) => void }> = ({ 
+  state, setState, onUpdateText, onAddText, onAddMask, onUpdateMask, onUpdateGlobalStyle, onSplitText,
+  zoom = 1, setZoom = () => {} 
 }) => {
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
   const selectedText = selectedPage?.textObjects.find(t => state.selectedTextIds.includes(t.id));
@@ -339,56 +343,93 @@ export const EditorToolbar: React.FC<SidebarProps> = ({
   if (!selectedPage || state.isGalleryView) return null;
 
   return (
-    <div className="flex items-center gap-6 h-full py-1">
-      {/* FONT & SIZE */}
-      <div className="flex flex-col gap-1 pr-4 border-r border-slate-800">
-        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">Text Styling</span>
-        <div className="flex items-center gap-1.5">
-          <input type="color" value={styleToDisplay.color} onChange={(e) => updateActiveStyle({ color: e.target.value })} className="w-6 h-6 rounded bg-slate-900 border border-slate-700 cursor-pointer" />
-          <select value={styleToDisplay.fontFamily} onChange={(e) => updateActiveStyle({ fontFamily: e.target.value })} className="h-7 bg-slate-900 border border-slate-800 rounded text-[10px] px-1 w-24 outline-none focus:ring-1 focus:ring-blue-500">
-            {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
-          </select>
-          <input type="number" value={styleToDisplay.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-10 h-7 bg-slate-900 border border-slate-800 rounded text-[10px] px-1" />
-          <button onClick={() => updateActiveStyle({ fontWeight: styleToDisplay.fontWeight === 'bold' ? 'normal' : 'bold' })} className={`w-7 h-7 rounded border text-[10px] font-bold ${styleToDisplay.fontWeight === 'bold' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>B</button>
-        </div>
-      </div>
-
-      {/* SNAPPING */}
-      <div className="flex flex-col gap-1 pr-4 border-r border-slate-800">
-        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">Pos/Snap</span>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 h-full py-1">
+      {/* 1. TEXT STYLE & EFFECTS (RESTORED OUTLINE & GLOW) */}
+      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
         <div className="flex flex-col gap-0.5">
-          <div className="flex gap-0.5">
-            {(['left', 'center', 'right', 'none'] as Alignment[]).map((align) => (
-              <button key={align} onClick={() => updateActiveStyle({ alignment: align })} className={`w-6 h-4 text-[8px] font-bold rounded ${styleToDisplay.alignment === align ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>{align === 'none' ? 'OFF' : align[0].toUpperCase()}</button>
-            ))}
+          <span className="text-[7px] text-slate-500 font-bold uppercase">Style & Effects</span>
+          <div className="flex items-center gap-1.5">
+            <input type="color" value={styleToDisplay.color} onChange={(e) => updateActiveStyle({ color: e.target.value })} className="w-5 h-5 rounded bg-slate-900 border border-slate-700 cursor-pointer" title="Text Color" />
+            <select value={styleToDisplay.fontFamily} onChange={(e) => updateActiveStyle({ fontFamily: e.target.value })} className="h-6 bg-slate-900 border border-slate-800 rounded text-[9px] px-1 w-20 outline-none">
+              {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
+            </select>
+            <input type="number" value={styleToDisplay.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-9 h-6 bg-slate-900 border border-slate-800 rounded text-[9px] px-1" />
+            <button onClick={() => updateActiveStyle({ fontWeight: styleToDisplay.fontWeight === 'bold' ? 'normal' : 'bold' })} className={`w-6 h-6 rounded border text-[9px] font-bold ${styleToDisplay.fontWeight === 'bold' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>B</button>
+            
+            {/* Outline & Glow Quick Controls */}
+            <div className="flex items-center gap-1 ml-1 pl-2 border-l border-slate-800">
+              <input type="color" value={styleToDisplay.outlineColor} onChange={(e) => updateActiveStyle({ outlineColor: e.target.value })} className="w-4 h-4 rounded-full" title="Outline Color" />
+              <input type="range" min="0" max="10" value={styleToDisplay.outlineWidth} onChange={(e) => updateActiveStyle({ outlineWidth: Number(e.target.value) })} className="w-10 accent-blue-500" title="Outline Width" />
+              <input type="color" value={styleToDisplay.glowColor} onChange={(e) => updateActiveStyle({ glowColor: e.target.value })} className="w-4 h-4 rounded-full" title="Glow Color" />
+            </div>
           </div>
-          <div className="flex gap-0.5">
-            {(['top', 'middle', 'bottom', 'none'] as VerticalAlignment[]).map((vAlign) => (
-              <button key={vAlign} onClick={() => updateActiveStyle({ verticalAlignment: vAlign })} className={`w-6 h-4 text-[8px] font-bold rounded ${styleToDisplay.verticalAlignment === vAlign ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-500'}`}>{vAlign === 'none' ? 'OFF' : vAlign[0].toUpperCase()}</button>
+        </div>
+      </div>
+
+      {/* 2. POS/SNAP & PARAGRAPH ALIGN (RESTORED) */}
+      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[7px] text-slate-500 font-bold uppercase">Snapping & Align</span>
+          <div className="flex gap-1">
+            <div className="flex bg-slate-900 p-0.5 rounded border border-slate-800">
+              {(['left', 'center', 'right', 'none'] as Alignment[]).map((a) => (
+                <button key={a} onClick={() => updateActiveStyle({ alignment: a })} className={`w-5 h-5 text-[7px] font-bold rounded ${styleToDisplay.alignment === a ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{a === 'none' ? 'X' : a[0].toUpperCase()}</button>
+              ))}
+            </div>
+            <div className="flex bg-slate-900 p-0.5 rounded border border-slate-800">
+              {(['top', 'middle', 'bottom', 'none'] as VerticalAlignment[]).map((v) => (
+                <button key={v} onClick={() => updateActiveStyle({ verticalAlignment: v })} className={`w-5 h-5 text-[7px] font-bold rounded ${styleToDisplay.verticalAlignment === v ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{v === 'none' ? 'X' : v[0].toUpperCase()}</button>
+              ))}
+            </div>
+            {/* Paragraph Align inside box */}
+            <div className="flex bg-slate-900 p-0.5 rounded border border-slate-800 ml-1">
+              {(['left', 'center', 'right'] as Alignment[]).map((a) => (
+                <button key={a} onClick={() => updateActiveStyle({ textAlign: a })} className={`w-5 h-5 text-[7px] font-bold rounded ${styleToDisplay.textAlign === a ? 'bg-emerald-600 text-white' : 'text-slate-500'}`}>{a[0].toUpperCase()}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. SAFE AREA / MARGINS (RESTORED) */}
+      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[7px] text-slate-500 font-bold uppercase">Safe Area (Margin)</span>
+          <div className="flex gap-1">
+            {['Top', 'Bottom', 'Left', 'Right'].map((dir) => (
+              <div key={dir} className="flex flex-col items-center">
+                <input type="number" value={(styleToDisplay as any)[`padding${dir}`]} onChange={(e) => updateActiveStyle({ [`padding${dir}`]: Number(e.target.value) })} className="w-7 h-5 bg-slate-900 border border-slate-800 rounded text-[8px] text-center" title={dir} />
+              </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* QUICK TOOLS */}
-      <div className="flex flex-col gap-1">
-        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">Quick Tools</span>
-        <div className="flex items-center gap-1.5">
-         <button onClick={() => onAddText(selectedPage.id)} className="h-7 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold">+ Text</button>
-          <button onClick={() => onAddMask(selectedPage.id, 'rect')} className="h-7 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-[10px] font-bold flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-            Square
-          </button>
-          <button onClick={() => onAddMask(selectedPage.id, 'oval')} className="h-7 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-[10px] font-bold flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Oval
-          </button>
-          <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-7 px-2 border rounded text-[10px] font-bold transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>Smart Bucket</button>
-          {selectedText && <button onClick={onSplitText} className="h-7 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold">Split</button>}
+      {/* 4. ZOOM CONTROLS (NEW) */}
+      <div className="flex items-center gap-2 pr-4 border-r border-slate-800">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[7px] text-slate-500 font-bold uppercase">Zoom</span>
+          <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded border border-slate-800">
+            <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="w-5 h-5 bg-slate-800 hover:bg-slate-700 rounded text-[10px]">-</button>
+            <span className="text-[8px] w-7 text-center font-mono">{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="w-5 h-5 bg-slate-800 hover:bg-slate-700 rounded text-[10px]">+</button>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. QUICK TOOLS */}
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[7px] text-slate-500 font-bold uppercase">Quick Tools</span>
+        <div className="flex items-center gap-1">
+          <button onClick={() => onAddText(selectedPage.id)} className="h-6 px-1.5 bg-blue-600 text-white rounded text-[8px] font-bold">+ TEXT</button>
+          <button onClick={() => onAddMask(selectedPage.id, 'rect')} className="h-6 px-1.5 bg-slate-800 text-slate-300 rounded text-[8px] font-bold">SQUARE</button>
+          <button onClick={() => onAddMask(selectedPage.id, 'oval')} className="h-6 px-1.5 bg-slate-800 text-slate-300 rounded text-[8px] font-bold">OVAL</button>
+          <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-6 px-1.5 border rounded text-[8px] font-bold transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>SMART BUCKET</button>
+          {selectedText && <button onClick={onSplitText} className="h-6 px-1.5 bg-indigo-600 text-white rounded text-[8px] font-bold">SPLIT</button>}
           {selectedMask && (
-            <div className="flex items-center gap-2 ml-2 pl-2 border-l border-slate-800">
-              <span className="text-[8px] text-slate-500 font-bold">OPA</span>
-              <input type="range" min="0" max="1" step="0.1" value={selectedMask.opacity ?? 1} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })} className="w-16 accent-blue-500 h-1" />
+            <div className="flex items-center gap-1 ml-1 pl-1 border-l border-slate-800">
+              <span className="text-[6px] text-slate-500">OPA</span>
+              <input type="range" min="0" max="1" step="0.1" value={selectedMask.opacity ?? 1} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })} className="w-12 accent-blue-500 h-1" />
             </div>
           )}
         </div>
