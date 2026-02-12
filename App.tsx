@@ -257,6 +257,7 @@ const App: React.FC = () => {
       pages: prev.pages.map(p => p.id === pageId ? { ...p, masks: [...(p.masks || []), maskData] } : p),
     selectedTextIds: [],
       selectedMaskIds: [maskData.id]
+      
     }));
   }, [recordHistory]);
 
@@ -518,54 +519,68 @@ const App: React.FC = () => {
         onDeleteLayer={deleteObjectById}
         onToggleVisibility={toggleObjectVisibility}
       />
-        <main className="flex-1 relative overflow-auto bg-slate-900 p-8">
+        <main className="flex-1 relative overflow-hidden bg-slate-900 flex flex-col">
         {state.pages.length === 0 ? (
-          <div className="h-full flex items-center justify-center"><Uploader onUpload={handleUpload} /></div>
+          <div className="h-full flex-1 flex items-center justify-center"><Uploader onUpload={handleUpload} /></div>
         ) : (
-          <>
+          <div className="flex-1 flex flex-col h-full p-6 overflow-hidden">
             {state.isGalleryView ? (
-              <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={handleSelectPage} />
+              <div className="overflow-auto h-full">
+                <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={handleSelectPage} />
+              </div>
             ) : (
-              <div className="h-full flex flex-col items-center">
-                {/* ... (kode navigasi navbar tetap sama) ... */}
-                <div className="mb-4 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
+              <div className="flex flex-col h-full gap-4 overflow-hidden">
+                {/* BARIS 1: NAVIGASI UTAMA */}
+                <div className="shrink-0 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
                     <div className="flex items-center gap-2">
-                         {/* ... tombol back, prev, next, undo, redo tetap sama ... */}
-                        <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextId: null }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
+                        <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextIds: [], selectedMaskIds: [] }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
+                        {/* ... (lanjutkan sisa tombol navigasi Anda di sini) ... */}
                         <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
                         <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-                        <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Next"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
-                        <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                        <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
-                        <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-                          </svg>
-                        </button>
+                        <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
                     </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p>
-                      <p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p>
+                    <div className="flex items-center gap-3 pr-4 text-right">
+                      <div>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p>
+                        <p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p>
+                      </div>
+                    </div>
+                </div>
+
+                {/* BARIS 2: TOOLBAR SETTINGS (STYLE & TOOLS DARI SIDEBAR) */}
+                {selectedPage && (
+                  <div id="editor-horizontal-toolbar" className="shrink-0 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 shadow-2xl overflow-x-auto">
+                    {/* Area ini akan diisi oleh konten Sidebar pada langkah berikutnya */}
+                    <div className="flex items-start gap-8 min-w-max px-2">
+                       <p className="text-[10px] text-slate-500 italic">Settings & Tools moved here...</p>
                     </div>
                   </div>
-                </div>
-                {selectedPage && (
-                  <Editor key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={effectiveImportMode} 
-                    onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} 
-                    onUpdateMask={(id, upd) => updateMask(selectedPage.id, id, upd)}
-                    selectedTextIds={state.selectedTextIds} 
-                    selectedMaskIds={state.selectedMaskIds}
-                    onSelectText={ids => setState(p => ({ ...p, selectedTextIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedMaskIds: [] }))}
-                    onSelectMask={ids => setState(p => ({ ...p, selectedMaskIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedTextIds: [] }))}
-                    onRecordHistory={recordHistory} onResize={setPreviewWidth} 
-                    isSmartFill={state.isSmartFillMode} // Prop baru
-                    onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)} // Prop baru
-                  />
                 )}
+
+                {/* BARIS 3: CANVAS EDITOR */}
+                <div className="flex-1 relative min-h-0 bg-slate-900 rounded-2xl overflow-hidden shadow-inner border border-slate-800/50">
+                  {selectedPage && (
+                    <Editor 
+                      key={selectedPage.id} 
+                      page={selectedPage} 
+                      hideLabels={state.hideLabels} 
+                      importMode={effectiveImportMode} 
+                      onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} 
+                      onUpdateMask={(id, upd) => updateMask(selectedPage.id, id, upd)}
+                      selectedTextIds={state.selectedTextIds} 
+                      selectedMaskIds={state.selectedMaskIds}
+                      onSelectText={ids => setState(p => ({ ...p, selectedTextIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedMaskIds: [] }))}
+                      onSelectMask={ids => setState(p => ({ ...p, selectedMaskIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedTextIds: [] }))}
+                      onRecordHistory={recordHistory} 
+                      onResize={setPreviewWidth} 
+                      isSmartFill={state.isSmartFillMode}
+                      onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)}
+                    />
+                  )}
+                </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </main>
     </div>

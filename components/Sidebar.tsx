@@ -251,90 +251,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         </SectionPanel>
-
-        {/* GROUP 3: STYLE SETTINGS */}
-        <SectionPanel title={selectedPage?.isLocalStyle ? 'Local Style Settings' : 'Global Style Settings'} isOpen={openSections.style} onToggle={() => toggle('style')}>
-          <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
-            {renderStyleEditor(styleToDisplay)}
-          </div>
-        </SectionPanel>
-
-        {/* GROUP 4: TEXT BACKGROUND & TOOLS */}
-        {selectedPage && (
-          <SectionPanel title="Text Background & Tools" isOpen={openSections.tools} onToggle={() => toggle('tools')} headerClass="text-indigo-400">
-            <div className="p-3 border border-slate-800 rounded-xl bg-slate-900/20 space-y-3">
-              <button onClick={() => onAddText(selectedPage.id)} className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all">+ Manual Text Box</button>
-              
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <button onClick={() => onAddMask(selectedPage.id, 'rect')} className="py-2 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-600 transition-all flex items-center justify-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-                  + Square
-                </button>
-                <button onClick={() => onAddMask(selectedPage.id, 'oval')} className="py-2 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-600 transition-all flex items-center justify-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  + Oval
-                </button>
-              </div>
-
-              <button 
-                onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, 
-                  selectedTextIds: [], 
-                  selectedMaskIds: []
-                 }))} 
-                className={`w-full mt-1 py-2 border rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse shadow-lg shadow-pink-500/20' : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-pink-500 hover:text-pink-500'}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                {state.isSmartFillMode ? 'CLICK ON BUBBLE TO FILL...' : 'Smart Bucket (Auto Fill)'}
-              </button>
-
-              {selectedText && (
-                <div className="mt-4 space-y-3 pt-4 border-t border-slate-800/50">
-                  <button onClick={onSplitText} className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-all">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-                    Split into Lines
-                  </button>
-                  <textarea value={selectedText.originalText} onChange={(e) => onUpdateText(selectedPage.id, selectedText.id, { originalText: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-xs h-20 outline-none focus:ring-1 focus:ring-blue-500 transition-all scrollbar-thin" />
-                </div>
-              )}
-
-              {selectedMask && (
-                <div className="mt-4 p-3 bg-slate-800/30 rounded border border-slate-700/50 space-y-3">
-                  <div>
-                    <div className="flex justify-between text-[9px] text-slate-400 mb-1 uppercase font-bold">
-                      <span>Mask Opacity</span>
-                      <span>{Math.round((selectedMask.opacity ?? 1) * 100)}%</span>
-                    </div>
-                    <input type="range" min="0" max="1" step="0.05" value={selectedMask.opacity ?? 1} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })} className="w-full accent-blue-500 h-1.5 cursor-pointer" />
-                  </div>
-
-                  {selectedMask.type !== 'image' && (
-                    <div className="space-y-3 pt-3 border-t border-slate-700/50">
-                      <div>
-                        <label className="block text-[9px] text-slate-500 uppercase mb-1 font-bold">Bubble Shape</label>
-                        <div className="flex bg-slate-900 rounded p-1 gap-1">
-                          <button onClick={() => onUpdateMask(selectedPage.id, selectedMask.id, { shape: 'rect' })} className={`flex-1 py-1 text-[9px] font-bold rounded transition-all ${selectedMask.shape !== 'oval' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Square</button>
-                          <button onClick={() => onUpdateMask(selectedPage.id, selectedMask.id, { shape: 'oval' })} className={`flex-1 py-1 text-[9px] font-bold rounded transition-all ${selectedMask.shape === 'oval' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Oval</button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[9px] text-slate-500 uppercase mb-1 font-bold">Outline</label>
-                          <input type="color" value={selectedMask.stroke || '#000000'} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { stroke: e.target.value })} className="w-full h-7 rounded bg-slate-900 border border-slate-700 cursor-pointer" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] text-slate-500 uppercase mb-1 font-bold">Width</label>
-                          <input type="number" value={selectedMask.strokeWidth || 0} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { strokeWidth: Number(e.target.value) })} className="w-full h-7 bg-slate-900 border border-slate-700 rounded text-[9px] px-1" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </SectionPanel>
-        )}
-      </div>
-
+</div>
       {/* GROUP 5: LAYER MANAGER */}
       {selectedPage && (
         <div className="px-6 mb-6">
@@ -397,6 +314,92 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
       <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold bg-slate-950">v2.1.2 Pro</div>
     </aside>
+  );
+};
+// --- Tambahkan Export Baru di Sidebar.tsx (Letakkan sebelum export default Sidebar) ---
+
+export const EditorToolbar: React.FC<SidebarProps> = ({ 
+  state, setState, onUpdateText, onAddText, onAddMask, onUpdateMask, onUpdateGlobalStyle, onSplitText 
+}) => {
+  const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
+  const selectedText = selectedPage?.textObjects.find(t => state.selectedTextIds.includes(t.id));
+  const selectedMask = selectedPage?.masks?.find(m => state.selectedMaskIds.includes(m.id));
+  const activeStyle = (selectedPage?.isLocalStyle && selectedPage.localStyle) ? selectedPage.localStyle : state.globalStyle;
+
+  const updateActiveStyle = (updates: Partial<TextStyle>) => {
+    if (state.selectedTextIds.length > 0 && selectedPage) {
+      state.selectedTextIds.forEach(id => onUpdateText(selectedPage.id, id, updates));
+    } else {
+      onUpdateGlobalStyle({ ...activeStyle, ...updates });
+    }
+  };
+
+  const styleToDisplay = (selectedText && !state.isGalleryView) ? (selectedText as TextStyle) : activeStyle;
+
+  if (!selectedPage || state.isGalleryView) return null;
+
+  return (
+    <div className="flex items-start gap-6 px-2 py-1 h-full">
+      {/* GROUP: FONT & COLOR */}
+      <div className="flex items-center gap-3 pr-6 border-r border-slate-800">
+        <div className="flex flex-col gap-1">
+          <label className="text-[9px] text-slate-500 font-bold uppercase">Font & Color</label>
+          <div className="flex items-center gap-2">
+            <input type="color" value={styleToDisplay.color} onChange={(e) => updateActiveStyle({ color: e.target.value })} className="w-8 h-8 rounded bg-slate-900 border border-slate-700 cursor-pointer" />
+            <select value={styleToDisplay.fontFamily} onChange={(e) => updateActiveStyle({ fontFamily: e.target.value })} className="h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-2 w-24">
+              {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
+            </select>
+            <input type="number" value={styleToDisplay.fontSize} onChange={(e) => updateActiveStyle({ fontSize: Number(e.target.value) })} className="w-14 h-8 bg-slate-900 border border-slate-700 rounded text-[10px] px-2" />
+            <button onClick={() => updateActiveStyle({ fontWeight: styleToDisplay.fontWeight === 'bold' ? 'normal' : 'bold' })} className={`h-8 px-3 rounded border text-[9px] font-bold transition-all ${styleToDisplay.fontWeight === 'bold' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>B</button>
+          </div>
+        </div>
+      </div>
+
+      {/* GROUP: POSITION & MARGIN */}
+      <div className="flex items-center gap-4 pr-6 border-r border-slate-800">
+        <div className="flex flex-col gap-1">
+          <label className="text-[9px] text-slate-500 font-bold uppercase">Snapping</label>
+          <div className="flex gap-1 bg-slate-900 p-1 rounded border border-slate-800">
+            {(['left', 'center', 'right', 'none'] as Alignment[]).map((align) => (
+              <button key={align} onClick={() => updateActiveStyle({ alignment: align })} className={`w-7 h-6 text-[9px] font-bold rounded transition-all ${styleToDisplay.alignment === align ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{align === 'none' ? 'OFF' : align[0].toUpperCase()}</button>
+            ))}
+          </div>
+          <div className="flex gap-1 bg-slate-900 p-1 rounded border border-slate-800">
+            {(['top', 'middle', 'bottom', 'none'] as VerticalAlignment[]).map((vAlign) => (
+              <button key={vAlign} onClick={() => updateActiveStyle({ verticalAlignment: vAlign })} className={`w-7 h-6 text-[9px] font-bold rounded transition-all ${styleToDisplay.verticalAlignment === vAlign ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{vAlign === 'none' ? 'OFF' : vAlign[0].toUpperCase()}</button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex flex-col gap-1">
+          <label className="text-[9px] text-slate-500 font-bold uppercase">Margin</label>
+          <div className="grid grid-cols-2 gap-1">
+             {['Top', 'Bottom', 'Left', 'Right'].map((dir) => (
+               <input key={dir} type="number" title={dir} value={(styleToDisplay as any)[`padding${dir}`]} onChange={(e) => updateActiveStyle({ [`padding${dir}`]: Number(e.target.value) })} className="w-10 h-6 bg-slate-900 border border-slate-700 rounded text-[9px] text-center" />
+             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* GROUP: TOOLS */}
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[9px] text-slate-500 font-bold uppercase">Tools</label>
+          <div className="flex items-center gap-2">
+            <button onClick={() => onAddText(selectedPage.id)} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold">+ Text</button>
+            <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-8 px-3 border rounded-lg text-[10px] font-bold flex items-center gap-2 transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>Smart Bucket</button>
+            {selectedText && <button onClick={onSplitText} className="h-8 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold">Split Lines</button>}
+          </div>
+        </div>
+        
+        {selectedMask && (
+          <div className="flex flex-col gap-1 border-l border-slate-800 pl-3">
+            <label className="text-[9px] text-slate-400 font-bold uppercase">Mask Opacity</label>
+            <input type="range" min="0" max="1" step="0.1" value={selectedMask.opacity ?? 1} onChange={(e) => onUpdateMask(selectedPage.id, selectedMask.id, { opacity: Number(e.target.value) })} className="w-20 accent-blue-500 h-1.5" />
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
