@@ -343,10 +343,13 @@ const applyLocalToGlobal = useCallback((pageId: string) => {
       ...prev,
       globalStyle: newGlobalStyle,
       pages: prev.pages.map(p => {
-        // Update semua halaman yang menggunakan global style
-        if (!p.isLocalStyle || p.id === pageId) {
+        const isTargetPage = p.id === pageId;
+        // Update halaman global (yg tidak local) DAN halaman sumber (target)
+        if (!p.isLocalStyle || isTargetPage) {
           return {
             ...p,
+            // SINKRONISASI: Update localStyle agar UI Sidebar tidak revert
+            localStyle: isTargetPage ? newGlobalStyle : p.localStyle,
             textObjects: p.textObjects.map(t => ({ ...t, ...newGlobalStyle }))
           };
         }
