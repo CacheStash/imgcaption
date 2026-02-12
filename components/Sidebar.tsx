@@ -55,7 +55,7 @@ const SectionPanel: React.FC<{
 );
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  state, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText, onDuplicate, onDeleteLayer, onToggleVisibility
+  state, zoom, setZoom, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText, onDuplicate, onDeleteLayer, onToggleVisibility
 }) => {
   // State panel lipat
   const [openSections, setOpenSections] = useState({
