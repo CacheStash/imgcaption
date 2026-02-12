@@ -507,7 +507,7 @@ const App: React.FC = () => {
   }, [recordHistory]);
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex h-screen w-full bg-slate-950 text-slate-100 overflow-hidden">
       <Sidebar 
         state={state} setState={setState} onTextImport={handleTextImport}
         onUpdateText={updatePageText} onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask}
@@ -519,78 +519,64 @@ const App: React.FC = () => {
         onDeleteLayer={deleteObjectById}
         onToggleVisibility={toggleObjectVisibility}
       />
-        <main className="flex-1 relative overflow-hidden bg-slate-900 flex flex-col">
+      
+      <main className="flex-1 flex flex-col relative bg-slate-900 overflow-hidden">
         {state.pages.length === 0 ? (
-          <div className="h-full flex-1 flex items-center justify-center"><Uploader onUpload={handleUpload} /></div>
+          <div className="h-full flex-1 flex items-center justify-center p-12">
+            <Uploader onUpload={handleUpload} />
+          </div>
         ) : (
-          <div className="flex-1 flex flex-col h-full p-6 overflow-hidden">
+          <div className="flex-1 flex flex-col w-full h-full p-6 gap-4 overflow-hidden">
             {state.isGalleryView ? (
-              <div className="overflow-auto h-full">
+              <div className="flex-1 overflow-auto">
                 <Gallery pages={state.pages} hideLabels={state.hideLabels} onSelectPage={handleSelectPage} />
               </div>
             ) : (
-              <div className="flex flex-col h-full gap-4 overflow-hidden">
-                {/* BARIS 1: NAVIGASI UTAMA */}
-                <div className="shrink-0 flex items-center gap-4 w-full justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextIds: [], selectedMaskIds: [] }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors">← Back</button>
-                        {/* ... (lanjutkan sisa tombol navigasi Anda di sini) ... */}
-                        <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                        <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-                        <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
-                    </div>
-                    <div className="flex items-center gap-3 pr-4 text-right">
-                      <div>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedPage?.fileName}</p>
-                        <p className="text-[10px] text-blue-500">Page {currentPageIndex + 1}</p>
-                      </div>
-                    </div>
+              <div className="flex-1 flex flex-col w-full h-full gap-4 overflow-hidden">
+                {/* BARIS 1: NAVIGASI */}
+                <div className="shrink-0 flex items-center justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setState(prev => ({ ...prev, isGalleryView: true, selectedPageId: null, selectedTextIds: [], selectedMaskIds: [] }))} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition-all">← BACK</button>
+                    <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
+                    <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+                    <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
+                  </div>
+                  <div className="text-right pr-4">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-tighter">{selectedPage?.fileName}</p>
+                    <p className="text-[10px] text-blue-500 font-bold">PAGE {currentPageIndex + 1}</p>
+                  </div>
                 </div>
 
-                {/* BARIS 2: TOOLBAR SETTINGS (STYLE & TOOLS DARI SIDEBAR) */}
+                {/* BARIS 2: TOOLBAR */}
                 {selectedPage && (
-                  <div id="editor-horizontal-toolbar" className="shrink-0 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 shadow-2xl overflow-x-auto">
-                    {/* Area ini akan diisi oleh konten Sidebar pada langkah berikutnya */}
+                  <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 shadow-xl overflow-x-auto scrollbar-none">
                     <EditorToolbar 
-                      state={state} 
-                      setState={setState} 
-                      onUpdateText={updatePageText} 
-                      onAddText={addTextManually} 
-                      onAddMask={addMaskManually} 
-                      onUpdateMask={updateMask} 
-                      onUpdateGlobalStyle={updateGlobalStyle} 
-                      onSplitText={splitSelectedText}
-                      // Tambahkan props yang kurang di bawah ini agar error hilang:
-                      onTextImport={handleTextImport}
-                      onClearAll={clearAllData}
-                      onExportZip={handleExportZip}
-                      onDownloadSingle={handleDownloadSinglePage}
-                      onToggleLocal={toggleLocalSettings}
-                      isExporting={isExporting}
+                      state={state} setState={setState} onUpdateText={updatePageText} 
+                      onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask} 
+                      onUpdateGlobalStyle={updateGlobalStyle} onSplitText={splitSelectedText}
+                      onTextImport={handleTextImport} onClearAll={clearAllData}
+                      onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
+                      onToggleLocal={toggleLocalSettings} isExporting={isExporting}
                     />
                   </div>
                 )}
 
-                {/* BARIS 3: CANVAS EDITOR */}
-                <div className="flex-1 relative min-h-0 bg-slate-900 rounded-2xl overflow-hidden shadow-inner border border-slate-800/50">
-                  {selectedPage && (
-                    <Editor 
-                      key={selectedPage.id} 
-                      page={selectedPage} 
-                      hideLabels={state.hideLabels} 
-                      importMode={effectiveImportMode} 
-                      onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} 
-                      onUpdateMask={(id, upd) => updateMask(selectedPage.id, id, upd)}
-                      selectedTextIds={state.selectedTextIds} 
-                      selectedMaskIds={state.selectedMaskIds}
-                      onSelectText={ids => setState(p => ({ ...p, selectedTextIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedMaskIds: [] }))}
-                      onSelectMask={ids => setState(p => ({ ...p, selectedMaskIds: Array.isArray(ids) ? ids : (ids ? [ids] : []), selectedTextIds: [] }))}
-                      onRecordHistory={recordHistory} 
-                      onResize={setPreviewWidth} 
-                      isSmartFill={state.isSmartFillMode}
-                      onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)}
-                    />
-                  )}
+                {/* BARIS 3: AREA EDITOR (DIPAKSA BESAR DENGAN flex-1 DAN h-full) */}
+                <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 shadow-2xl flex items-center justify-center overflow-hidden">
+                  <div className="w-full h-full flex items-center justify-center p-4">
+                    {selectedPage && (
+                      <Editor 
+                        key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={effectiveImportMode} 
+                        onUpdateText={(id, upd) => updatePageText(selectedPage.id, id, upd)} 
+                        onUpdateMask={(id, upd) => updateMask(selectedPage.id, id, upd)}
+                        selectedTextIds={state.selectedTextIds} selectedMaskIds={state.selectedMaskIds}
+                        onSelectText={ids => setState(p => ({ ...p, selectedTextIds: ids, selectedMaskIds: [] }))}
+                        onSelectMask={ids => setState(p => ({ ...p, selectedMaskIds: ids, selectedTextIds: [] }))}
+                        onRecordHistory={recordHistory} onResize={setPreviewWidth} 
+                        isSmartFill={state.isSmartFillMode} onAddSmartMask={(mask) => addSmartMask(selectedPage.id, mask)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             )}
