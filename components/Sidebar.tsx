@@ -22,6 +22,7 @@ interface SidebarProps {
   onToggleVisibility?: (id: string) => void;
   zoom: number;
   setZoom: (z: number) => void;
+  onApplyLocalToGlobal?: (pageId: string) => void;
 }
 
 // Sub-komponen panel lipat dengan animasi halus
@@ -56,6 +57,7 @@ const SectionPanel: React.FC<{
 
 const Sidebar: React.FC<SidebarProps> = ({ 
   state, zoom, setZoom, setState, onTextImport, onUpdateText, onAddText, onAddMask, onUpdateMask, onClearAll, onUpdateGlobalStyle, onExportZip, onDownloadSingle, onToggleLocal, isExporting, onSplitText, onDuplicate, onDeleteLayer, onToggleVisibility
+, onApplyLocalToGlobal
 }) => {
   // State panel lipat
   const [openSections, setOpenSections] = useState({
@@ -248,6 +250,14 @@ const Sidebar: React.FC<SidebarProps> = ({
               {selectedPage && !state.isGalleryView && (
                 <button onClick={() => onToggleLocal(selectedPage.id)} className={`w-full py-2 text-[10px] font-bold rounded border transition-all ${selectedPage.isLocalStyle ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'}`}>
                   {selectedPage.isLocalStyle ? 'LOCAL OVERRIDE ACTIVE' : 'USE GLOBAL SETTINGS'}
+                </button>
+              )}
+              {selectedPage?.isLocalStyle && !state.isGalleryView && (
+                <button 
+                  onClick={() => onApplyLocalToGlobal?.(selectedPage.id)}
+                  className="w-full mt-2 py-2 text-[10px] font-bold rounded border border-blue-500/50 text-blue-400 hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-all uppercase tracking-wider shadow-sm"
+                >
+                  Apply Current to Global
                 </button>
               )}
             </div>

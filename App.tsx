@@ -330,6 +330,31 @@ const App: React.FC = () => {
     }));
   }, [recordHistory]);
 
+const applyLocalToGlobal = useCallback((pageId: string) => {
+    const page = state.pages.find(p => p.id === pageId);
+    if (!page || !page.localStyle) return;
+    
+    if (!window.confirm("Apply this page's style to all other pages?")) return;
+
+    recordHistory();
+    const newGlobalStyle = JSON.parse(JSON.stringify(page.localStyle));
+    
+    setState(prev => ({
+      ...prev,
+      globalStyle: newGlobalStyle,
+      pages: prev.pages.map(p => {
+        // Update semua halaman yang menggunakan global style
+        if (!p.isLocalStyle || p.id === pageId) {
+          return {
+            ...p,
+            textObjects: p.textObjects.map(t => ({ ...t, ...newGlobalStyle }))
+          };
+        }
+        return p;
+      })
+    }));
+  }, [state.pages, recordHistory]);
+  
   // Helper untuk Auto Activate Local (FIX Poin 4)
   const activatePageLocal = (page: Page, globalStyle: TextStyle, globalMode: ImportMode): Page => {
     if (page.isLocalStyle === undefined) {
@@ -519,6 +544,7 @@ const App: React.FC = () => {
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
         onSplitText={splitSelectedText} onDuplicate={duplicateSelectedElement}
         onDeleteLayer={deleteObjectById} onToggleVisibility={toggleObjectVisibility}
+        onApplyLocalToGlobal={applyLocalToGlobal}
         zoom={zoom} setZoom={setZoom}
       />
       
