@@ -245,7 +245,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
         
         let finalWidth, finalHeight;
         
-        // Logika Fit to Screen (Maintain Aspect Ratio)
+        // Logika Best Fit (Akan mengikuti rasio manapun yang lebih dominan)
         if (imgRatio > contRatio) {
           finalWidth = contWidth;
           finalHeight = contWidth / imgRatio;
@@ -253,6 +253,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
           finalHeight = contHeight;
           finalWidth = contHeight * imgRatio;
         }
+
         
         fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
         img.set({ 
@@ -262,7 +263,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
           selectable: false, 
           evented: false 
         });
-        
+
         fCanvas.setBackgroundImage(img, () => {
           setContainerSize({ width: finalWidth, height: finalHeight });
           callbacks.current.onResize(finalWidth);

@@ -374,7 +374,15 @@ export const EditorToolbar: React.FC<SidebarProps> = ({
       <div className="flex flex-col gap-1">
         <span className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">Quick Tools</span>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => onAddText(selectedPage.id)} className="h-7 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold">+ Text</button>
+         <button onClick={() => onAddText(selectedPage.id)} className="h-7 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold">+ Text</button>
+          <button onClick={() => onAddMask(selectedPage.id, 'rect')} className="h-7 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-[10px] font-bold flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+            Square
+          </button>
+          <button onClick={() => onAddMask(selectedPage.id, 'oval')} className="h-7 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-[10px] font-bold flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Oval
+          </button>
           <button onClick={() => setState(prev => ({ ...prev, isSmartFillMode: !prev.isSmartFillMode, selectedTextIds: [], selectedMaskIds: [] }))} className={`h-7 px-2 border rounded text-[10px] font-bold transition-all ${state.isSmartFillMode ? 'bg-pink-600 border-pink-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>Smart Bucket</button>
           {selectedText && <button onClick={onSplitText} className="h-7 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold">Split</button>}
           {selectedMask && (
