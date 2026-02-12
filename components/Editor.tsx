@@ -241,11 +241,27 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
       fabric.Image.fromURL(page.imageUrl, (img: any) => {
         if (!img) return;
         const imgRatio = img.width / img.height; 
-        let finalWidth = contWidth, finalHeight = contWidth / imgRatio;
-        if (finalHeight > contHeight) { finalHeight = contHeight; finalWidth = contHeight * imgRatio; }
+        const contRatio = contWidth / contHeight;
+        
+        let finalWidth, finalHeight;
+        
+        // Logika Fit to Screen (Maintain Aspect Ratio)
+        if (imgRatio > contRatio) {
+          finalWidth = contWidth;
+          finalHeight = contWidth / imgRatio;
+        } else {
+          finalHeight = contHeight;
+          finalWidth = contHeight * imgRatio;
+        }
         
         fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
-        img.set({ scaleX: finalWidth/img.width, scaleY: finalHeight/img.height, left: 0, top: 0, selectable: false, evented: false });
+        img.set({ 
+          scaleX: finalWidth / img.width, 
+          scaleY: finalHeight / img.height, 
+          left: 0, top: 0, 
+          selectable: false, 
+          evented: false 
+        });
         
         fCanvas.setBackgroundImage(img, () => {
           setContainerSize({ width: finalWidth, height: finalHeight });
