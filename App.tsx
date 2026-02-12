@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Page, TextObject, AppState, TextStyle, ImportMode, MaskObject } from './types';
 import { generateId, parseRawText, createDefaultTextObject, DEFAULT_STYLE, cleanText, getPosFromAlign } from './utils/helpers';
-import Sidebar from './components/Sidebar';
+import Sidebar, { EditorToolbar } from './components/Sidebar';
 
 import Gallery from './components/Gallery';
 import Editor from './components/Editor';
@@ -551,9 +551,23 @@ const App: React.FC = () => {
                 {selectedPage && (
                   <div id="editor-horizontal-toolbar" className="shrink-0 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 shadow-2xl overflow-x-auto">
                     {/* Area ini akan diisi oleh konten Sidebar pada langkah berikutnya */}
-                    <div className="flex items-start gap-8 min-w-max px-2">
-                       <p className="text-[10px] text-slate-500 italic">Settings & Tools moved here...</p>
-                    </div>
+                    <EditorToolbar 
+                      state={state} 
+                      setState={setState} 
+                      onUpdateText={updatePageText} 
+                      onAddText={addTextManually} 
+                      onAddMask={addMaskManually} 
+                      onUpdateMask={updateMask} 
+                      onUpdateGlobalStyle={updateGlobalStyle} 
+                      onSplitText={splitSelectedText}
+                      // Tambahkan props yang kurang di bawah ini agar error hilang:
+                      onTextImport={handleTextImport}
+                      onClearAll={clearAllData}
+                      onExportZip={handleExportZip}
+                      onDownloadSingle={handleDownloadSinglePage}
+                      onToggleLocal={toggleLocalSettings}
+                      isExporting={isExporting}
+                    />
                   </div>
                 )}
 
