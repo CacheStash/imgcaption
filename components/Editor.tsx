@@ -317,7 +317,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
         textAlign: obj.textAlign || 'center', 
         originX: originX,   
         originY: originY, 
-        backgroundColor: obj.backgroundColor || 'transparent',
+        backgroundColor: 'transparent',
         fontFamily: obj.fontFamily, 
         text: content, 
         fontWeight: obj.fontWeight || 'normal',
