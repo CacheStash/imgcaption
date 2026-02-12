@@ -560,8 +560,8 @@ const App: React.FC = () => {
                 </div>
 
                 {/* BARIS 3: AREA EDITOR - INI FIX AGAR BESAR */}
-                <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 flex items-center justify-center overflow-hidden">
-                  <div className="w-full h-full flex items-center justify-center">
+                <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden">
+                 <div className="w-full h-full flex items-center justify-center">
                     {selectedPage && (
                       <Editor 
                         key={selectedPage.id} page={selectedPage} hideLabels={state.hideLabels} importMode={effectiveImportMode} 

@@ -445,7 +445,7 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
   }, [page.textObjects, page.masks, containerSize, hideLabels, importMode]);
 
   return (
-    <div ref={containerRef} className="flex-1 w-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden min-h-[400px]">
+    <div ref={containerRef} className="w-full h-full flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden">
       <canvas ref={canvasRef} />
     </div>
   );
