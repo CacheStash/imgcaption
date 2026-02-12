@@ -254,7 +254,6 @@ callbacks.current = { onUpdateText, onUpdateMask, onSelectText, onSelectMask, on
           finalWidth = contHeight * imgRatio;
         }
 
-
         fCanvas.setDimensions({ width: finalWidth, height: finalHeight });
         img.set({ 
           scaleX: finalWidth / img.width, 

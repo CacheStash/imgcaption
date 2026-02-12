@@ -516,10 +516,8 @@ const App: React.FC = () => {
         onClearAll={clearAllData} onUpdateGlobalStyle={updateGlobalStyle}
         onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
         onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-        onSplitText={splitSelectedText}
-        onDuplicate={duplicateSelectedElement}
-        onDeleteLayer={deleteObjectById}
-        onToggleVisibility={toggleObjectVisibility}
+        onSplitText={splitSelectedText} onDuplicate={duplicateSelectedElement}
+        onDeleteLayer={deleteObjectById} onToggleVisibility={toggleObjectVisibility}
       />
       
       <main className="flex-1 flex flex-col min-w-0 bg-slate-900 overflow-hidden relative">
@@ -542,29 +540,24 @@ const App: React.FC = () => {
                     <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
                     <button onClick={goToPrevPage} disabled={currentPageIndex <= 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
                     <button onClick={goToNextPage} disabled={currentPageIndex >= state.pages.length - 1} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
-                    <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-                    <button onClick={undo} disabled={history.past.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
-                    <button onClick={redo} disabled={history.future.length === 0} className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" /></svg></button>
                   </div>
-                  <div className="text-right pr-4 shrink-0">
+                  <div className="text-right pr-4">
                     <p className="text-[9px] text-slate-500 font-black uppercase tracking-tighter truncate max-w-[150px]">{selectedPage?.fileName}</p>
                     <p className="text-[10px] text-blue-500 font-bold">PAGE {currentPageIndex + 1}</p>
                   </div>
                 </div>
 
                 {/* BARIS 2: TOOLBAR */}
-                {selectedPage && (
-                  <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 shadow-xl overflow-x-auto scrollbar-none w-full">
-                    <EditorToolbar 
-                      state={state} setState={setState} onUpdateText={updatePageText} 
-                      onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask} 
-                      onUpdateGlobalStyle={updateGlobalStyle} onSplitText={splitSelectedText}
-                      onTextImport={handleTextImport} onClearAll={clearAllData}
-                      onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
-                      onToggleLocal={toggleLocalSettings} isExporting={isExporting}
-                    />
-                  </div>
-                )}
+                <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 shadow-xl overflow-x-auto scrollbar-none w-full">
+                  <EditorToolbar 
+                    state={state} setState={setState} onUpdateText={updatePageText} 
+                    onAddText={addTextManually} onAddMask={addMaskManually} onUpdateMask={updateMask} 
+                    onUpdateGlobalStyle={updateGlobalStyle} onSplitText={splitSelectedText}
+                    onTextImport={handleTextImport} onClearAll={clearAllData}
+                    onExportZip={handleExportZip} onDownloadSingle={handleDownloadSinglePage}
+                    onToggleLocal={toggleLocalSettings} isExporting={isExporting}
+                  />
+                </div>
 
                 {/* BARIS 3: AREA EDITOR - INI FIX AGAR BESAR */}
                 <div className="flex-1 min-h-0 w-full relative bg-slate-950 rounded-2xl border border-slate-800/50 flex items-center justify-center overflow-hidden">
